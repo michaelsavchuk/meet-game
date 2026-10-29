@@ -1,8 +1,19 @@
 console.log('chat observer v2');
 
-// Meet/Google Chat message observer.
-// Runs inside the chat.google.com frame that Meet embeds (and also in a normal chat.google.com tab).
-(() => {
+// Meet event observer. One script, two jobs depending on which frame it lands in:
+//  - chat.google.com (the chat frame Meet embeds, or a normal Chat tab): new chat messages  -> 'chat-message'
+//  - meet.google.com (the top-level call page): emoji reactions on video tiles              -> 'meet-reaction'
+
+// Hand off to the extension's background worker (also fires a DOM event so it works without an extension).
+function send(type, eventName, payload) {
+  if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+    chrome.runtime.sendMessage({ type, payload });
+  }
+  window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
+}
+
+// ---- Chat messages (chat.google.com) ----
+function observeChat() {
   if (window.__meetChatObserver) return;          // don't double-install
   window.__meetChatObserver = true;
 
@@ -41,11 +52,7 @@ console.log('chat observer v2');
   }
 
   function emit(msg) {
-    // Hand off to the extension's background worker (falls back to a DOM event when run without an extension).
-    if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-      chrome.runtime.sendMessage({ type: 'chat-message', msg });
-    }
-    window.dispatchEvent(new CustomEvent('meet-chat-message', { detail: msg }));
+    send('chat-message', 'meet-chat-message', msg);
     console.log('[meet-chat]', msg.sender, ':', msg.text);
   }
 
@@ -64,4 +71,44 @@ console.log('chat observer v2');
   }
 
   new MutationObserver(scan).observe(document.body, { childList: true, subtree: true, characterData: true });
-})();
+}
+
+// ---- In-call emoji reactions (meet.google.com) ----
+// When someone reacts, Meet drops an <img data-emoji> badge into their video tile.
+// The tile carries data-participant-id and the person's name in span.notranslate.
+function observeReactions() {
+  if (window.__meetTileReactionObserver) return;
+  window.__meetTileReactionObserver = true;
+
+  const seen = new WeakSet();
+
+  function handle(img) {
+    if (seen.has(img)) return;
+    const tile = img.closest('[data-participant-id]');
+    if (!tile) return;                                    // not a tile badge (picker, floating bubble, etc.)
+    if (img.closest('[role="dialog"],[role="menu"],[role="toolbar"],button')) return;
+    const emoji = img.getAttribute('data-emoji');
+    if (!emoji) return;
+    seen.add(img);
+
+    const evt = {
+      emoji,
+      participantId: tile.getAttribute('data-participant-id'),
+      sender: tile.querySelector('span.notranslate')?.innerText?.trim() || null,
+      receivedAt: new Date().toISOString(),
+    };
+    send('meet-reaction', 'meet-tile-reaction', evt);
+    console.log('[meet-reaction]', evt.sender, evt.emoji);
+  }
+
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) {
+      if (n.nodeType !== 1) continue;
+      if (n.matches('img[data-emoji]')) handle(n);
+      n.querySelectorAll?.('img[data-emoji]').forEach(handle);
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+}
+
+if (location.hostname === 'chat.google.com') observeChat();
+else if (location.hostname === 'meet.google.com') observeReactions();

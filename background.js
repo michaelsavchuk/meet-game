@@ -1,11 +1,18 @@
 // Change this to your game server. Default: the local stub server in server.js.
-const GAME_ENDPOINT = 'http://localhost:8787/messages';
+const GAME_SERVER = 'http://localhost:8787';
+
+// Each event type posts to its own endpoint.
+const ROUTES = {
+  'chat-message': '/messages',
+  'meet-reaction': '/reactions',
+};
 
 chrome.runtime.onMessage.addListener((m) => {
-  if (m?.type !== 'chat-message') return;
-  fetch(GAME_ENDPOINT, {
+  const path = ROUTES[m?.type];
+  if (!path) return;
+  fetch(GAME_SERVER + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(m.msg),
+    body: JSON.stringify(m.payload),
   }).catch((err) => console.warn('Game server unreachable:', err.message));
 });
