@@ -265,10 +265,19 @@ export class Character extends Phaser.GameObjects.Container {
     this.scene.tweens.add({ targets: this.emoji, alpha: 0.2, duration: 70, yoyo: true, repeat: 2 });
   }
 
+  // A quick "nope" wobble, e.g. when a chat message didn't hit anyone.
+  shakeHead() {
+    this.shakeTween?.remove();
+    this.figure.setAngle(0);
+    this.shakeTween = this.scene.tweens.add({ targets: this.figure, angle: { from: -14, to: 14 }, duration: 70, yoyo: true, repeat: 2, onComplete: () => this.figure.setAngle(0) });
+    return this;
+  }
+
   // Fall over, fade out, and stop moving.
   knockOut() {
     this.out = true;
     this.cancelChase();
+    this.shakeTween?.remove();
     this.setSword(false).setBubble(null);
     this.hearts.setVisible(false);
     this.figure.y = 0;

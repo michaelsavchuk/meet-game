@@ -34,6 +34,10 @@ Phases, one scene each (`game/src/scenes/`):
    One attack at a time per player (words typed mid-chase are ignored); typing your own word does nothing.
    Mutual chases (A chasing B while B chases A): when they meet, whoever started their chase first
    (`chaseStart`) lands the hit and the other attack fizzles ("too slow!"); see `land()`.
+   Miss feedback (`missReason()`): a fighter's message that attacks nobody shakes their head and floats a
+   label: "❌" (no match), "so close!" (one edit from a live word, `nearMiss()` in words.js), "that's you!"
+   (own word), "too late!" (`lastWord` of someone typing a new one, or a knocked-out player's word), or
+   "busy!" (a live word while already chasing; plain chatter mid-chase shows nothing).
    Chase visuals: targets show a wobbling "‼️" (with "×N" for several chasers; BattleScene recounts
    chasers every frame and calls `setAlert()`), and chasers leave a 💨 trail (`puff()`).
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.
@@ -55,7 +59,8 @@ bubble, hearts, chase/hit/knock-out, `separate()` to keep characters from stacki
 ## Running and testing
 - `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787. `PORT=… npm start` uses another port.
 - Dev keys (fake events go through the server like real ones): lobby **C** = a fake player joins,
-  **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat.
+  **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat,
+  **T** = a typo of someone's word.
   Or `curl -XPOST localhost:8787/messages -d '{"id":"1","userId":"u","sender":"Ada","text":"hi","receivedAt":"t"}'`.
 - `window.game` is the Phaser game, e.g. `game.scene.getScene('battle').fighters` in the console.
 - After changing `extension/`, reload it in chrome://extensions.

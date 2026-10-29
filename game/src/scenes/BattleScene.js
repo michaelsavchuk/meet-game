@@ -1,12 +1,13 @@
 import * as Phaser from 'phaser';
 import { listen, simulateChat, simulateReaction, FAKE_EMOJI } from '../bridge.js';
 import { roster } from '../roster.js';
-import { pickWord, tokenize } from '../words.js';
+import { pickWord, tokenize, nearMiss } from '../words.js';
 import { Character, separate } from '../objects/Character.js';
 import { Button } from '../objects/Button.js';
 import { WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED } from '../config.js';
 
 const LOG_LINES = 4;
+const MISS_COLORS = { 'so close!': '#ffd84d', '❌': '#ffffff' };
 
 // Phase 2: everyone gets a word. Typing another player's word sends your character to attack them.
 // Last one standing wins (phase 3: the winner banner, then back to the lobby).
@@ -18,8 +19,8 @@ export class BattleScene extends Phaser.Scene {
   create() {
     this.over = false;
     this.log = [];
-    // name -> { name, character, hp, word, out, revealTimer }. After a hit, word is null while they
-    // "type" a new one, and revealTimer brings it back.
+    // name -> { name, character, hp, word, lastWord, out, revealTimer }. After a hit, word is null while
+    // they "type" a new one (lastWord keeps the old one), and revealTimer brings a new one.
     this.fighters = new Map();
 
     // Everyone in the roster when the round starts plays; anyone who joins later waits for the next round.
@@ -28,7 +29,7 @@ export class BattleScene extends Phaser.Scene {
       const word = pickWord(taken);
       taken.add(word);
       const character = new Character(this, player).setSword(true).setHp(MAX_HP, MAX_HP).setBubble(word, { highlight: true });
-      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, out: false, revealTimer: null });
+      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, lastWord: null, out: false, revealTimer: null });
     }
 
     this.add.text(WIDTH / 2, 48, "Type someone's word to attack!", { fontSize: '36px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
@@ -42,7 +43,8 @@ export class BattleScene extends Phaser.Scene {
     listen(this, { chat: this.onChat, reaction: this.onReaction });
 
     this.input.keyboard.on('keydown-ENTER', () => this.over && this.backToLobby());
-    // Dev: C = a random fighter attacks someone, X = a random fighter chats a non-word, R = a random fighter reacts.
+    // Dev: C = a random fighter attacks someone, X = a random fighter chats a non-word, T = a typo of someone's
+    // word, R = a random fighter reacts.
     this.input.keyboard.on('keydown-C', () => {
       const alive = this.alive();
       const victim = Phaser.Utils.Array.GetRandom(alive.filter((f) => f.word));
@@ -52,6 +54,12 @@ export class BattleScene extends Phaser.Scene {
     this.input.keyboard.on('keydown-X', () => {
       const alive = this.alive();
       if (alive.length) simulateChat(Phaser.Utils.Array.GetRandom(alive).name, 'where is everyone');
+    });
+    this.input.keyboard.on('keydown-T', () => {
+      const alive = this.alive();
+      const victim = Phaser.Utils.Array.GetRandom(alive.filter((f) => f.word));
+      const sender = Phaser.Utils.Array.GetRandom(alive.filter((f) => f !== victim));
+      if (victim && sender) simulateChat(sender.name, victim.word + victim.word.at(-1));   // doubled last letter
     });
     this.input.keyboard.on('keydown-R', () => {
       if (this.fighters.size) simulateReaction(Phaser.Utils.Array.GetRandom([...this.fighters.keys()]), Phaser.Utils.Array.GetRandom(FAKE_EMOJI));
@@ -86,11 +94,30 @@ export class BattleScene extends Phaser.Scene {
       if (!roster.has(name)) { roster.join(name); this.addLog(`👋 ${name} joins next round`); }
       return;
     }
-    if (this.over || attacker.out || attacker.character.chasing) return;   // one attack at a time
+    if (this.over || attacker.out) return;
 
     const words = tokenize(text);
     const victim = this.alive().find((f) => f !== attacker && words.has(f.word));
-    if (victim) this.attack(attacker, victim);
+    if (victim && !attacker.character.chasing) { this.attack(attacker, victim); return; }   // one attack at a time
+
+    const reason = this.missReason(attacker, words, victim);
+    if (!reason) return;
+    attacker.character.shakeHead();
+    // Replace this fighter's previous label so quick messages don't pile up.
+    if (attacker.missText) { this.tweens.killTweensOf(attacker.missText); attacker.missText.destroy(); }
+    attacker.missText = this.floatText(attacker.character.x, attacker.character.y - 125, reason, MISS_COLORS[reason] ?? '#aab0c8');
+  }
+
+  // What to show over a fighter whose message didn't attack anyone, or null to show nothing.
+  missReason(attacker, words, victim) {
+    if (attacker.character.chasing) return victim ? 'busy!' : null;   // plain chatter mid-chase is fine
+    if (words.has(attacker.word)) return "that's you!";
+    // An old word: someone who was just hit (now "typing"), or a knocked-out player.
+    const others = [...this.fighters.values()].filter((f) => f !== attacker);
+    if (others.some((f) => words.has(f.lastWord) || (f.out && words.has(f.word)))) return 'too late!';
+    const live = others.filter((f) => !f.out && f.word).map((f) => f.word);
+    if ([...words].some((t) => live.some((w) => nearMiss(t, w)))) return 'so close!';
+    return '❌';
   }
 
   onReaction({ player: { name }, emoji }) {
@@ -132,6 +159,7 @@ export class BattleScene extends Phaser.Scene {
     // nobody new can target them until it appears. Chasers already on their way still land their
     // hits; each hit restarts the delay.
     if (victim.word) {
+      victim.lastWord = victim.word;   // typing it now says "too late!"
       victim.word = null;
       victim.character.setTyping();
     }
@@ -201,6 +229,7 @@ export class BattleScene extends Phaser.Scene {
   floatText(x, y, text, color) {
     const t = this.add.text(x, y, text, { fontSize: '28px', fontStyle: 'bold', color }).setOrigin(0.5).setDepth(20000);
     this.tweens.add({ targets: t, y: y - 50, alpha: 0, duration: 800, onComplete: () => t.destroy() });
+    return t;
   }
 
   confetti() {

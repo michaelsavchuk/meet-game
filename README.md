@@ -21,12 +21,13 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
    to run away (slower than the chasers, so they still get caught). Each player has
    3 hearts. When you get hit, your bubble shows "…" while you "type" a new word and your character
    runs away from everyone. Nobody new can target you until the word appears (2.5s after the last hit). You can only make one attack at a time. If two players chase each other, whoever typed first gets the hit.
+   A message that misses shows why over your character: ❌, "so close!" for a typo, "that's you!", "too late!" for an old word, or "busy!" mid-chase.
 3. **Winner**: the last player standing wins. **Back to lobby** starts over with the same players.
 
 ## Run it
 1. `npm install`, then `npm start` (or `npm run dev` to restart on server changes).
 2. Open http://localhost:8787. Dev keys send fake events through the server: **C** fake join (lobby) or
-   attack (battle), **X** fake non-word chat, **R** fake reaction.
+   attack (battle), **X** fake non-word chat, **T** fake typo, **R** fake reaction.
 3. Go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `extension/` folder.
 4. In the Meet call, open the chat panel and share the game tab. Participants' chats and reactions show up in the game.
 
