@@ -14,7 +14,10 @@ export const DAMAGE = 1;
 
 export const WANDER_SPEED = 70;     // px/s while bouncing around
 export const CHASE_SPEED = 380;     // px/s while running at a target
+export const FLEE_SPEED = 160;      // px/s while "typing" and steering away from others (chasers still catch up)
+export const FLEE_RADIUS = 320;     // others closer than this are steered away from while fleeing
 export const ATTACK_RANGE = 55;     // how close an attacker gets before swinging
 export const CHASE_TIMEOUT = 5000;  // ms; land the hit anyway if a chase drags on
+export const WORD_DELAY = 2500;     // ms after a hit before the victim's new word appears (they "type" until then)
 
 export const CHAT_BUBBLE_MS = 4000; // how long lobby chat stays above a character

@@ -4,7 +4,7 @@ import { roster } from '../roster.js';
 import { pickWord, tokenize } from '../words.js';
 import { Character, separate } from '../objects/Character.js';
 import { Button } from '../objects/Button.js';
-import { WIDTH, HEIGHT, MAX_HP, DAMAGE } from '../config.js';
+import { WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY } from '../config.js';
 
 const LOG_LINES = 4;
 
@@ -18,7 +18,9 @@ export class BattleScene extends Phaser.Scene {
   create() {
     this.over = false;
     this.log = [];
-    this.fighters = new Map();   // name -> { name, character, hp, word, out }
+    // name -> { name, character, hp, word, out, revealTimer }. After a hit, word is null while they
+    // "type" a new one, and revealTimer brings it back.
+    this.fighters = new Map();
 
     // Everyone in the roster when the round starts plays; anyone who joins later waits for the next round.
     const taken = new Set();
@@ -26,7 +28,7 @@ export class BattleScene extends Phaser.Scene {
       const word = pickWord(taken);
       taken.add(word);
       const character = new Character(this, player).setSword(true).setHp(MAX_HP, MAX_HP).setBubble(word, { highlight: true });
-      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, out: false });
+      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, out: false, revealTimer: null });
     }
 
     this.add.text(WIDTH / 2, 48, "Type someone's word to attack!", { fontSize: '36px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
@@ -43,9 +45,9 @@ export class BattleScene extends Phaser.Scene {
     // Dev: C = a random fighter attacks someone, X = a random fighter chats a non-word, R = a random fighter reacts.
     this.input.keyboard.on('keydown-C', () => {
       const alive = this.alive();
-      if (alive.length < 2) return;
-      const [attacker, victim] = Phaser.Utils.Array.Shuffle(alive);
-      simulateChat(attacker.name, `${victim.word}!`);
+      const victim = Phaser.Utils.Array.GetRandom(alive.filter((f) => f.word));
+      const attacker = Phaser.Utils.Array.GetRandom(alive.filter((f) => f !== victim));
+      if (victim && attacker) simulateChat(attacker.name, `${victim.word}!`);
     });
     this.input.keyboard.on('keydown-X', () => {
       const alive = this.alive();
@@ -58,7 +60,11 @@ export class BattleScene extends Phaser.Scene {
 
   update(time, delta) {
     const characters = [...this.fighters.values()].map((f) => f.character);
+    const alive = characters.filter((c) => !c.out);
     separate(characters, delta);
+    for (const character of alive) {
+      if (character.fleeing) character.steerAway(alive.filter((c) => c !== character), delta);
+    }
     for (const character of characters) character.update(time, delta);
   }
 
@@ -84,10 +90,8 @@ export class BattleScene extends Phaser.Scene {
 
   // ---- Combat ----
 
+  // The victim keeps their word during the chase, so others can pile on until the first hit lands.
   attack(attacker, victim) {
-    // The victim gets a new word right away so nobody can repeat the same one.
-    victim.word = pickWord(new Set([...this.fighters.values()].map((f) => f.word)));
-    victim.character.setBubble(victim.word, { highlight: true });
     this.addLog(`${attacker.name} ⚔️ ${victim.name}`);
     attacker.character.chase(victim.character, () => this.land(attacker, victim));
   }
@@ -101,11 +105,34 @@ export class BattleScene extends Phaser.Scene {
     this.cameras.main.shake(120, 0.004);
     this.floatText(victim.character.x, victim.character.y - 70, `-${DAMAGE}`, '#ff6b6b');
 
-    if (victim.hp === 0) this.knockOut(victim, attacker);
+    if (victim.hp === 0) { this.knockOut(victim, attacker); return; }
+
+    // The victim loses their word and "types" a new one (running away from everyone meanwhile), so
+    // nobody new can target them until it appears. Chasers already on their way still land their
+    // hits; each hit restarts the delay.
+    if (victim.word) {
+      victim.word = null;
+      victim.character.setTyping();
+      victim.character.fleeing = true;
+    }
+    this.revealWordLater(victim);
+  }
+
+  // After WORD_DELAY, give the fighter a fresh word (they're attackable again).
+  revealWordLater(fighter) {
+    fighter.revealTimer?.remove();
+    fighter.revealTimer = this.time.delayedCall(WORD_DELAY, () => {
+      fighter.revealTimer = null;
+      fighter.character.fleeing = false;
+      if (this.over || fighter.out) return;
+      fighter.word = pickWord(new Set([...this.fighters.values()].map((f) => f.word)));
+      fighter.character.setBubble(fighter.word, { highlight: true, pop: true });
+    });
   }
 
   knockOut(victim, by) {
     victim.out = true;
+    victim.revealTimer?.remove();
     victim.character.knockOut();
     this.addLog(`💀 ${by.name} knocked out ${victim.name}`);
     for (const f of this.fighters.values()) {

@@ -17,8 +17,9 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
 1. **Lobby**: type anything in chat to join and get a random emoji character. React with any emoji to
    change it. The host clicks **Start game** (or presses Enter) once 2+ people have joined.
 2. **Battle**: everyone gets a word in a speech bubble. Type someone else's word in chat and your
-   character runs over and hits them. Each player has 3 hearts; the victim gets a new word every
-   time they're attacked. You can only make one attack at a time.
+   character runs over and hits them. Several people can chase the same player. Each player has
+   3 hearts. When you get hit, your bubble shows "…" while you "type" a new word and your character
+   runs away from everyone. Nobody new can target you until the word appears (2.5s after the last hit). You can only make one attack at a time.
 3. **Winner**: the last player standing wins. **Back to lobby** starts over with the same players.
 
 ## Run it

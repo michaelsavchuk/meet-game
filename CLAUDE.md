@@ -24,8 +24,13 @@ Phases, one scene each (`game/src/scenes/`):
    Host clicks Start (2+ players) or presses Enter. "Clear players" empties the roster.
 2. **BattleScene**: everyone in the roster gets a unique word (`words.js`) in a speech bubble. Typing
    another player's word (whole word, case-insensitive) makes your character chase and hit them.
-   Rules: 3 HP, 1 per hit; the victim gets a new word as soon as the attack is typed; one attack
-   at a time per player (words typed mid-chase are ignored); typing your own word does nothing.
+   Rules: 3 HP, 1 per hit. The victim keeps their word while attackers run at them, so several
+   players can chase the same person. When a hit lands, the victim's word is cleared (`word = null`)
+   and their bubble shows an SMS-style "…" typing indicator, so nobody new can target them. While
+   typing they flee (`character.fleeing`, `steerAway()`: away from other players and walls, at
+   `FLEE_SPEED`, slower than chasers). Chasers
+   already on the way still hit, and each hit restarts the `WORD_DELAY` ms before a new word appears.
+   One attack at a time per player (words typed mid-chase are ignored); typing your own word does nothing.
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.
 3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" / Enter keeps the roster.
 
