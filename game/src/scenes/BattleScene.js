@@ -109,6 +109,17 @@ export class BattleScene extends Phaser.Scene {
   land(attacker, victim) {
     if (this.over || attacker.out || victim.out) return;
 
+    // Two players chasing each other: whoever typed first gets the hit, and the other attack fizzles.
+    const counter = victim.character;
+    if (counter.target === attacker.character) {
+      const counterFirst = counter.chaseStart < attacker.character.chaseStart;
+      const counterHit = counter.onArrive;
+      counter.cancelChase();
+      const slow = (counterFirst ? attacker : victim).character;
+      this.floatText(slow.x, slow.y - 110, 'too slow!', '#aab0c8');
+      if (counterFirst) { counterHit(); return; }
+    }
+
     attacker.character.swing();
     victim.hp = Math.max(0, victim.hp - DAMAGE);
     victim.character.setHp(victim.hp, MAX_HP).hurt(attacker.character.x, attacker.character.y);

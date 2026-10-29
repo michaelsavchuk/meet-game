@@ -32,6 +32,8 @@ Phases, one scene each (`game/src/scenes/`):
    `CHASED_FLEE_SPEED` while being chased (the faster if both), 0 otherwise. Fleeing characters
    `steerAway()` from other players and walls; both speeds are well below `CHASE_SPEED`.
    One attack at a time per player (words typed mid-chase are ignored); typing your own word does nothing.
+   Mutual chases (A chasing B while B chases A): when they meet, whoever started their chase first
+   (`chaseStart`) lands the hit and the other attack fizzles ("too slow!"); see `land()`.
    Chase visuals: targets show a wobbling "‼️" (with "×N" for several chasers; BattleScene recounts
    chasers every frame and calls `setAlert()`), and chasers leave a 💨 trail (`puff()`).
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.

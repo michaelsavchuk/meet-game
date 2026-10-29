@@ -20,7 +20,7 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
    character runs over and hits them. Several people can chase the same player, and the target tries
    to run away (slower than the chasers, so they still get caught). Each player has
    3 hearts. When you get hit, your bubble shows "…" while you "type" a new word and your character
-   runs away from everyone. Nobody new can target you until the word appears (2.5s after the last hit). You can only make one attack at a time.
+   runs away from everyone. Nobody new can target you until the word appears (2.5s after the last hit). You can only make one attack at a time. If two players chase each other, whoever typed first gets the hit.
 3. **Winner**: the last player standing wins. **Back to lobby** starts over with the same players.
 
 ## Run it
