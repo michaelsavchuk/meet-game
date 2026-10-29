@@ -5,6 +5,7 @@ const WALL_MARGIN = 120;   // while fleeing, walls closer than this push back so
 const PUFF_EVERY = 0.06;   // seconds between 💨 puffs while charging
 
 const SWORD = '🗡️';
+const SHIELD = '🛡️';
 
 // Nudge wandering characters apart so they don't stack. Chasers and knocked-out characters are left alone.
 export function separate(characters, delta) {
@@ -37,6 +38,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.out = false;
     this.target = null;
     this.fleeSpeed = 0;     // set by the scene; when > 0, moves at this speed and steers away (see steerAway)
+    this.chaseSpeed = CHASE_SPEED;   // the scene raises it during sudden death
 
     const angle = Math.random() * Math.PI * 2;
     this.vx = Math.cos(angle) * WANDER_SPEED;
@@ -45,7 +47,8 @@ export class Character extends Phaser.GameObjects.Container {
     // The figure (emoji + sword) hops; the labels under it stay put.
     this.emoji = scene.add.text(0, 0, player.emoji, { fontSize: '52px' }).setOrigin(0.5);
     this.sword = scene.add.text(30, 6, SWORD, { fontSize: '30px' }).setOrigin(0.5).setVisible(false);
-    this.figure = scene.add.container(0, 0, [this.sword, this.emoji]);
+    this.shield = scene.add.text(-30, 8, SHIELD, { fontSize: '28px' }).setOrigin(0.5).setVisible(false);
+    this.figure = scene.add.container(0, 0, [this.sword, this.shield, this.emoji]);
     this.nameText = scene.add.text(0, 38, player.name, { fontSize: '16px', color: '#e8e8f0', fontStyle: 'bold' }).setOrigin(0.5, 0);
     this.hearts = scene.add.text(0, 58, '', { fontSize: '14px' }).setOrigin(0.5, 0).setVisible(false);
     this.add([this.figure, this.nameText, this.hearts]);
@@ -72,6 +75,14 @@ export class Character extends Phaser.GameObjects.Container {
 
   setSword(visible) {
     this.sword.setVisible(visible);
+    return this;
+  }
+
+  // Hold up a shield (on the side away from the sword) while a counter is ready.
+  setShield(visible) {
+    if (visible === this.shield.visible) return this;
+    this.shield.setVisible(visible);
+    if (visible) this.scene.tweens.add({ targets: this.shield, scale: { from: 1.8, to: 1 }, duration: 200, ease: 'Back.easeOut' });
     return this;
   }
 
@@ -178,7 +189,7 @@ export class Character extends Phaser.GameObjects.Container {
       onArrive();
       return;
     }
-    const step = Math.min(dist, CHASE_SPEED * dt);
+    const step = Math.min(dist, this.chaseSpeed * dt);
     this.x += (dx / dist) * step;
     this.y += (dy / dist) * step;
 
@@ -234,6 +245,7 @@ export class Character extends Phaser.GameObjects.Container {
     if (Math.abs(dx) < 1) return;
     const right = dx > 0;
     this.sword.setX(right ? 30 : -30).setScale(right ? -1 : 1, 1);
+    this.shield.setX(right ? -30 : 30);
   }
 
   get chasing() { return this.target != null; }
@@ -256,12 +268,18 @@ export class Character extends Phaser.GameObjects.Container {
     this.scene.tweens.add({ targets: this.sword, angle: dir * 100, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
   }
 
-  hurt(fromX, fromY) {
+  // Bounce away from (fromX, fromY); stepWander eases the speed back down.
+  knockback(fromX, fromY, force) {
     const dx = this.x - fromX;
     const dy = this.y - fromY;
     const dist = Math.hypot(dx, dy) || 1;
-    this.vx = (dx / dist) * 450;   // knockback; stepWander eases it back down
-    this.vy = (dy / dist) * 450;
+    this.vx = (dx / dist) * force;
+    this.vy = (dy / dist) * force;
+    return this;
+  }
+
+  hurt(fromX, fromY) {
+    this.knockback(fromX, fromY, 450);
     this.scene.tweens.add({ targets: this.emoji, alpha: 0.2, duration: 70, yoyo: true, repeat: 2 });
   }
 
@@ -278,7 +296,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.out = true;
     this.cancelChase();
     this.shakeTween?.remove();
-    this.setSword(false).setBubble(null);
+    this.setSword(false).setShield(false).setBubble(null);
     this.hearts.setVisible(false);
     this.figure.y = 0;
     this.scene.tweens.add({ targets: this.figure, angle: 90, duration: 300, ease: 'Bounce.easeOut' });

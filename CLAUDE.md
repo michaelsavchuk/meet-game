@@ -32,8 +32,13 @@ Phases, one scene each (`game/src/scenes/`):
    `CHASED_FLEE_SPEED` while being chased (the faster if both), 0 otherwise. Fleeing characters
    `steerAway()` from other players and walls; both speeds are well below `CHASE_SPEED`.
    One attack at a time per player (words typed mid-chase are ignored); typing your own word does nothing.
-   Mutual chases (A chasing B while B chases A): when they meet, whoever started their chase first
-   (`chaseStart`) lands the hit and the other attack fizzles ("too slow!"); see `land()`.
+   Counter: while being chased, typing your chaser's word readies a parry against that chaser (🛡️ shows,
+   `fighter.parries`) instead of chasing back, so mutual chases don't happen. When that chaser arrives,
+   `clash()` knocks both back with no damage and gives both new words immediately (no "…" delay, so
+   nobody can pre-type a counter); other chasers still hit.
+   Sudden death (`updateSuddenDeath()`): after `SUDDEN_DEATH_AFTER` ms without a hit (parries don't count),
+   a banner shows and every chase gets faster each `SUDDEN_DEATH_STEP` ms, up to ×`SUDDEN_DEATH_MAX`, until
+   counters can't keep up. The next hit resets it.
    Miss feedback (`missReason()`): a fighter's message that attacks nobody shakes their head and floats a
    label: "❌" (no match), "so close!" (one edit from a live word, `nearMiss()` in words.js), "that's you!"
    (own word), "too late!" (`lastWord` of someone typing a new one, or a knocked-out player's word), or
@@ -46,7 +51,7 @@ Phases, one scene each (`game/src/scenes/`):
 `HudScene` runs on top of everything (connection status, dev key hints). Other pieces:
 `roster.js` (players across rounds, name → emoji), `objects/Character.js` (bouncing emoji, sword,
 bubble, hearts, chase/hit/knock-out, `separate()` to keep characters from stacking),
-`objects/Button.js`, `config.js` (HP, speeds, arena bounds and other tuning).
+`objects/Button.js`, `config.js` (HP, speeds, sudden death timing, arena bounds and other tuning).
 
 ## Conventions
 - No dependencies beyond Phaser and no build step: the server uses only Node built-ins, and the
@@ -60,7 +65,7 @@ bubble, hearts, chase/hit/knock-out, `separate()` to keep characters from stacki
 - `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787. `PORT=… npm start` uses another port.
 - Dev keys (fake events go through the server like real ones): lobby **C** = a fake player joins,
   **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat,
-  **T** = a typo of someone's word.
+  **T** = a typo of someone's word, **P** = a chased fighter counters their chaser.
   Or `curl -XPOST localhost:8787/messages -d '{"id":"1","userId":"u","sender":"Ada","text":"hi","receivedAt":"t"}'`.
 - `window.game` is the Phaser game, e.g. `game.scene.getScene('battle').fighters` in the console.
 - After changing `extension/`, reload it in chrome://extensions.

@@ -10,7 +10,7 @@ export class HudScene extends Phaser.Scene {
 
   create() {
     this.status = this.add.text(WIDTH - 20, 20, '', { fontSize: '16px' }).setOrigin(1, 0);
-    this.add.text(WIDTH - 12, HEIGHT - 6, 'dev: C fake chat/attack · X fake non-word chat · T fake typo · R fake reaction', { fontSize: '12px', color: '#5c6070' }).setOrigin(1, 1);
+    this.add.text(WIDTH - 12, HEIGHT - 6, 'dev: C fake chat/attack · X fake non-word chat · T fake typo · P fake counter · R fake reaction', { fontSize: '12px', color: '#5c6070' }).setOrigin(1, 1);
     this.setStatus(isConnected());
 
     this.game.events.on('bridge-status', this.setStatus, this);

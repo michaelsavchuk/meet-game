@@ -4,7 +4,10 @@ import { roster } from '../roster.js';
 import { pickWord, tokenize, nearMiss } from '../words.js';
 import { Character, separate } from '../objects/Character.js';
 import { Button } from '../objects/Button.js';
-import { WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED } from '../config.js';
+import {
+  WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED, CHASE_SPEED, CLASH_KNOCKBACK,
+  SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX,
+} from '../config.js';
 
 const LOG_LINES = 4;
 const MISS_COLORS = { 'so close!': '#ffd84d', '❌': '#ffffff' };
@@ -19,9 +22,12 @@ export class BattleScene extends Phaser.Scene {
   create() {
     this.over = false;
     this.log = [];
-    // name -> { name, character, hp, word, lastWord, out, revealTimer }. After a hit, word is null while
-    // they "type" a new one (lastWord keeps the old one), and revealTimer brings a new one.
+    // name -> { name, character, hp, word, lastWord, out, revealTimer, parries }. After a hit, word is null
+    // while they "type" a new one (lastWord keeps the old one), and revealTimer brings a new one.
+    // parries holds the chasers this fighter has countered (typed their word back); see land().
     this.fighters = new Map();
+    this.lastHitAt = this.time.now;   // for sudden death
+    this.suddenDeath = 0;             // 0 = off, then 1, 2, ... as chases speed up
 
     // Everyone in the roster when the round starts plays; anyone who joins later waits for the next round.
     const taken = new Set();
@@ -29,7 +35,7 @@ export class BattleScene extends Phaser.Scene {
       const word = pickWord(taken);
       taken.add(word);
       const character = new Character(this, player).setSword(true).setHp(MAX_HP, MAX_HP).setBubble(word, { highlight: true });
-      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, lastWord: null, out: false, revealTimer: null });
+      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, lastWord: null, out: false, revealTimer: null, parries: new Set() });
     }
 
     this.add.text(WIDTH / 2, 48, "Type someone's word to attack!", { fontSize: '36px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
@@ -44,7 +50,7 @@ export class BattleScene extends Phaser.Scene {
 
     this.input.keyboard.on('keydown-ENTER', () => this.over && this.backToLobby());
     // Dev: C = a random fighter attacks someone, X = a random fighter chats a non-word, T = a typo of someone's
-    // word, R = a random fighter reacts.
+    // word, P = a chased fighter counters their chaser, R = a random fighter reacts.
     this.input.keyboard.on('keydown-C', () => {
       const alive = this.alive();
       const victim = Phaser.Utils.Array.GetRandom(alive.filter((f) => f.word));
@@ -61,12 +67,17 @@ export class BattleScene extends Phaser.Scene {
       const sender = Phaser.Utils.Array.GetRandom(alive.filter((f) => f !== victim));
       if (victim && sender) simulateChat(sender.name, victim.word + victim.word.at(-1));   // doubled last letter
     });
+    this.input.keyboard.on('keydown-P', () => {
+      const chaser = Phaser.Utils.Array.GetRandom(this.alive().filter((f) => f.word && this.fighterOf(f.character.target)));
+      if (chaser) simulateChat(this.fighterOf(chaser.character.target).name, chaser.word);
+    });
     this.input.keyboard.on('keydown-R', () => {
       if (this.fighters.size) simulateReaction(Phaser.Utils.Array.GetRandom([...this.fighters.keys()]), Phaser.Utils.Array.GetRandom(FAKE_EMOJI));
     });
   }
 
   update(time, delta) {
+    this.updateSuddenDeath(time);
     const fighters = [...this.fighters.values()];
     const characters = fighters.map((f) => f.character);
     const alive = characters.filter((c) => !c.out);
@@ -76,8 +87,12 @@ export class BattleScene extends Phaser.Scene {
       if (character.target) chasers.set(character.target, (chasers.get(character.target) ?? 0) + 1);
     }
     // Players run away while typing a new word (word === null) and, a bit slower, while being chased.
-    for (const { character, word, out } of fighters) {
+    for (const { character, word, out, parries } of fighters) {
       if (out) continue;
+      // Forget counters against chasers who stopped coming (knocked out, or their chase ended elsewhere).
+      for (const chaser of parries) if (chaser.out || chaser.character.target !== character) parries.delete(chaser);
+      character.setShield(parries.size > 0);
+      character.chaseSpeed = CHASE_SPEED * (1 + this.suddenDeath * SUDDEN_DEATH_BOOST);
       const chasedBy = chasers.get(character) ?? 0;
       character.setAlert(chasedBy);
       character.fleeSpeed = this.over ? 0 : Math.max(word === null ? FLEE_SPEED : 0, chasedBy ? CHASED_FLEE_SPEED : 0);
@@ -97,6 +112,12 @@ export class BattleScene extends Phaser.Scene {
     if (this.over || attacker.out) return;
 
     const words = tokenize(text);
+    // Counter: typing the word of someone chasing you readies a parry instead of chasing them back.
+    const chaser = this.alive().find((f) => f.character.target === attacker.character && words.has(f.word));
+    if (chaser) {
+      if (!attacker.parries.has(chaser)) { attacker.parries.add(chaser); this.addLog(`🛡️ ${attacker.name} braces for ${chaser.name}`); }
+      return;
+    }
     const victim = this.alive().find((f) => f !== attacker && words.has(f.word));
     if (victim && !attacker.character.chasing) { this.attack(attacker, victim); return; }   // one attack at a time
 
@@ -135,18 +156,9 @@ export class BattleScene extends Phaser.Scene {
 
   land(attacker, victim) {
     if (this.over || attacker.out || victim.out) return;
+    if (victim.parries.delete(attacker)) { this.clash(attacker, victim); return; }
 
-    // Two players chasing each other: whoever typed first gets the hit, and the other attack fizzles.
-    const counter = victim.character;
-    if (counter.target === attacker.character) {
-      const counterFirst = counter.chaseStart < attacker.character.chaseStart;
-      const counterHit = counter.onArrive;
-      counter.cancelChase();
-      const slow = (counterFirst ? attacker : victim).character;
-      this.floatText(slow.x, slow.y - 110, 'too slow!', '#aab0c8');
-      if (counterFirst) { counterHit(); return; }
-    }
-
+    this.lastHitAt = this.time.now;
     attacker.character.swing();
     victim.hp = Math.max(0, victim.hp - DAMAGE);
     victim.character.setHp(victim.hp, MAX_HP).hurt(attacker.character.x, attacker.character.y);
@@ -166,15 +178,54 @@ export class BattleScene extends Phaser.Scene {
     this.revealWordLater(victim);
   }
 
+  // A countered hit: swords clang, both bounce apart, nobody takes damage, and both get new words right
+  // away (no "…" delay), so nobody can pre-type the other's word and parry on reflex.
+  clash(attacker, defender) {
+    const a = attacker.character;
+    const d = defender.character;
+    a.swing();
+    d.swing();
+    a.knockback(d.x, d.y, CLASH_KNOCKBACK);
+    d.knockback(a.x, a.y, CLASH_KNOCKBACK);
+    this.cameras.main.shake(100, 0.003);
+    this.floatText((a.x + d.x) / 2, (a.y + d.y) / 2 - 40, '💥', '#ffffff');
+    this.floatText(d.x, d.y - 125, 'parry!', '#7fd4ff');
+    this.addLog(`🛡️ ${defender.name} parried ${attacker.name}`);
+    const taken = new Set([attacker.word, attacker.lastWord, defender.word, defender.lastWord]);   // make sure the words change
+    for (const f of [attacker, defender]) {
+      f.revealTimer?.remove();
+      f.revealTimer = null;
+      if (f.word) f.lastWord = f.word;   // typing it now says "too late!"
+      this.newWord(f, taken);
+    }
+  }
+
+  // After SUDDEN_DEATH_AFTER ms without a hit, chases speed up a step every SUDDEN_DEATH_STEP ms.
+  // Counters don't reset it, so endless parrying can't stall the game. Hits do (see land()).
+  updateSuddenDeath(time) {
+    const idle = time - this.lastHitAt;
+    const max = (SUDDEN_DEATH_MAX - 1) / SUDDEN_DEATH_BOOST;
+    const level = this.over || idle < SUDDEN_DEATH_AFTER ? 0 : Math.min(max, 1 + Math.floor((idle - SUDDEN_DEATH_AFTER) / SUDDEN_DEATH_STEP));
+    if (level === this.suddenDeath) return;
+    if (level === 1 && this.suddenDeath === 0) this.banner('⚡ Sudden death!');
+    this.suddenDeath = level;
+    this.refreshAlive();
+  }
+
   // After WORD_DELAY, give the fighter a fresh word (they're attackable again).
   revealWordLater(fighter) {
     fighter.revealTimer?.remove();
     fighter.revealTimer = this.time.delayedCall(WORD_DELAY, () => {
       fighter.revealTimer = null;
       if (this.over || fighter.out) return;
-      fighter.word = pickWord(new Set([...this.fighters.values()].map((f) => f.word)));
-      fighter.character.setBubble(fighter.word, { highlight: true, pop: true });
+      this.newWord(fighter);
     });
+  }
+
+  // Give a fighter a word nobody else has (nor any in `avoid`) and pop it into their bubble.
+  newWord(fighter, avoid = []) {
+    fighter.word = pickWord(new Set([...this.fighters.values()].map((f) => f.word).concat(...avoid)));
+    fighter.character.setBubble(fighter.word, { highlight: true, pop: true });
   }
 
   knockOut(victim, by) {
@@ -212,7 +263,13 @@ export class BattleScene extends Phaser.Scene {
   }
 
   refreshAlive() {
-    this.aliveText.setText(`${this.alive().length} of ${this.fighters.size} still standing`);
+    const standing = `${this.alive().length} of ${this.fighters.size} still standing`;
+    const boost = 1 + this.suddenDeath * SUDDEN_DEATH_BOOST;
+    this.aliveText.setText(this.suddenDeath ? `${standing}  ·  ⚡ chases ×${boost}` : standing).setColor(this.suddenDeath ? '#ffd84d' : '#aab0c8');
+  }
+
+  fighterOf(character) {
+    return character && [...this.fighters.values()].find((f) => f.character === character);
   }
 
   addLog(line) {

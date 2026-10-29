@@ -20,5 +20,13 @@ export const FLEE_RADIUS = 320;     // others closer than this are steered away 
 export const ATTACK_RANGE = 55;     // how close an attacker gets before swinging
 export const CHASE_TIMEOUT = 5000;  // ms; land the hit anyway if a chase drags on
 export const WORD_DELAY = 2500;     // ms after a hit before the victim's new word appears (they "type" until then)
+export const CLASH_KNOCKBACK = 550; // px/s both fighters bounce apart when a counter parries a hit
+
+// Sudden death: after SUDDEN_DEATH_AFTER ms without a hit, chases get SUDDEN_DEATH_BOOST × CHASE_SPEED
+// faster every SUDDEN_DEATH_STEP ms (up to SUDDEN_DEATH_MAX ×), so counters eventually can't keep up.
+export const SUDDEN_DEATH_AFTER = 15000;
+export const SUDDEN_DEATH_STEP = 4000;
+export const SUDDEN_DEATH_BOOST = 0.5;
+export const SUDDEN_DEATH_MAX = 5;
 
 export const CHAT_BUBBLE_MS = 4000; // how long lobby chat stays above a character
