@@ -11,11 +11,20 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
 |--------------|------------|
 | `extension/` | Chrome extension that watches Meet chat and tile reactions and POSTs them to the server. |
 | `server/`    | Node server (no dependencies). Normalizes events, streams them to the game, serves `game/`. |
-| `game/`      | Phaser front end. `src/bridge.js` turns server events into `game.events`; scenes live in `src/scenes/`. |
+| `game/`      | Phaser front end. `src/bridge.js` turns server events into `game.events`; `LobbyScene` and `BattleScene` in `src/scenes/` are the game. |
+
+## How to play
+1. **Lobby**: type anything in chat to join and get a random emoji character. React with any emoji to
+   change it. The host clicks **Start game** (or presses Enter) once 2+ people have joined.
+2. **Battle**: everyone gets a word in a speech bubble. Type someone else's word in chat and your
+   character runs over and hits them. Each player has 3 hearts; the victim gets a new word every
+   time they're attacked. You can only make one attack at a time.
+3. **Winner**: the last player standing wins. **Back to lobby** starts over with the same players.
 
 ## Run it
 1. `npm install`, then `npm start` (or `npm run dev` to restart on server changes).
-2. Open http://localhost:8787. Press **C** / **R** to send fake chats / reactions through the server.
+2. Open http://localhost:8787. Dev keys send fake events through the server: **C** fake join (lobby) or
+   attack (battle), **X** fake non-word chat, **R** fake reaction.
 3. Go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `extension/` folder.
 4. In the Meet call, open the chat panel and share the game tab. Participants' chats and reactions show up in the game.
 

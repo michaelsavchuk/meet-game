@@ -14,8 +14,25 @@ extension/ --POST /messages, /reactions--> server/ --SSE /events--> game/ (Phase
 - `server/index.js` normalizes raw extension payloads into game events
   (`{ type: 'chat' | 'reaction', player: { id, name }, text | emoji, at }`), broadcasts them over
   SSE, and serves `game/` plus Phaser from `node_modules/phaser/dist` at `/vendor/`.
-- `game/src/bridge.js` re-emits server events on `game.events`. Scenes subscribe there and must
-  unsubscribe on `SHUTDOWN` (see `GameScene.js`). Game logic goes in scenes under `game/src/scenes/`.
+- `game/src/bridge.js` re-emits server events on `game.events`. Scenes subscribe with
+  `listen(this, { chat, reaction })`, which also unsubscribes on scene shutdown.
+- All game state lives in the browser (the server is only a relay); reloading the game page resets it.
+
+## The game
+Phases, one scene each (`game/src/scenes/`):
+1. **LobbyScene**: chatting anything joins (random character emoji); any reaction changes your emoji.
+   Host clicks Start (2+ players) or presses Enter. "Clear players" empties the roster.
+2. **BattleScene**: everyone in the roster gets a unique word (`words.js`) in a speech bubble. Typing
+   another player's word (whole word, case-insensitive) makes your character chase and hit them.
+   Rules: 3 HP, 1 per hit; the victim gets a new word as soon as the attack is typed; one attack
+   at a time per player (words typed mid-chase are ignored); typing your own word does nothing.
+   People who join mid-round and knocked-out players just watch; late joiners are in the next round.
+3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" / Enter keeps the roster.
+
+`HudScene` runs on top of everything (connection status, dev key hints). Other pieces:
+`roster.js` (players across rounds, name → emoji), `objects/Character.js` (bouncing emoji, sword,
+bubble, hearts, chase/hit/knock-out, `separate()` to keep characters from stacking),
+`objects/Button.js`, `config.js` (HP, speeds, arena bounds and other tuning).
 
 ## Conventions
 - No dependencies beyond Phaser and no build step: the server uses only Node built-ins, and the
@@ -27,15 +44,18 @@ extension/ --POST /messages, /reactions--> server/ --SSE /events--> game/ (Phase
 
 ## Running and testing
 - `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787. `PORT=… npm start` uses another port.
-- Press **C** / **R** in the game for fake chats/reactions; they go through the server like real ones.
+- Dev keys (fake events go through the server like real ones): lobby **C** = a fake player joins,
+  **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat.
   Or `curl -XPOST localhost:8787/messages -d '{"id":"1","userId":"u","sender":"Ada","text":"hi","receivedAt":"t"}'`.
+- `window.game` is the Phaser game, e.g. `game.scene.getScene('battle').fighters` in the console.
 - After changing `extension/`, reload it in chrome://extensions.
 
 ## Gotchas
 - Meet/Chat DOM selectors are fragile. Prefer semantic attributes (`role`, `data-*`, `aria-*`, ids)
   over minified class names or `jsname` values; keep a fallback when a minified token is unavoidable.
 - Chat and reactions use different ids for the same person (Chat user id vs. Meet participant id),
-  so the game keys players by display name.
+  so the game keys players by display name. Reactions only count for names that already joined via
+  chat. Unverified: the host's own video tile may label them "You", which wouldn't match their chat name.
 - Emoji typed in chat messages are dropped: Chat renders them as `<img data-emoji alt="…">` and the
   extension reads `innerText`.
 - Messages already on screen when the chat frame loads are treated as history and not sent.
