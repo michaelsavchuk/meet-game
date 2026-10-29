@@ -15,6 +15,7 @@ export const DAMAGE = 1;
 export const WANDER_SPEED = 70;     // px/s while bouncing around
 export const CHASE_SPEED = 380;     // px/s while running at a target
 export const FLEE_SPEED = 160;      // px/s while "typing" and steering away from others (chasers still catch up)
+export const CHASED_FLEE_SPEED = 120; // px/s while being chased (and not typing)
 export const FLEE_RADIUS = 320;     // others closer than this are steered away from while fleeing
 export const ATTACK_RANGE = 55;     // how close an attacker gets before swinging
 export const CHASE_TIMEOUT = 5000;  // ms; land the hit anyway if a chase drags on

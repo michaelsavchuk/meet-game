@@ -1,7 +1,8 @@
 import * as Phaser from 'phaser';
-import { ARENA, WANDER_SPEED, CHASE_SPEED, FLEE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
+import { ARENA, WANDER_SPEED, CHASE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
 
 const WALL_MARGIN = 120;   // while fleeing, walls closer than this push back so nobody gets cornered
+const PUFF_EVERY = 0.06;   // seconds between 💨 puffs while charging
 
 const SWORD = '🗡️';
 
@@ -35,7 +36,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.phase = Math.random() * Math.PI * 2;   // so characters don't hop in sync
     this.out = false;
     this.target = null;
-    this.fleeing = false;   // set by the scene; wanders faster and steers away (see steerAway)
+    this.fleeSpeed = 0;     // set by the scene; when > 0, moves at this speed and steers away (see steerAway)
 
     const angle = Math.random() * Math.PI * 2;
     this.vx = Math.cos(angle) * WANDER_SPEED;
@@ -54,7 +55,10 @@ export class Character extends Phaser.GameObjects.Container {
     this.bubbleText = scene.add.text(0, 0, '', { fontSize: '22px', color: '#1d1f27', fontStyle: 'bold' }).setOrigin(0.5);
     this.typingDots = [-14, 0, 14].map((dx) => scene.add.circle(dx, -26, 5, 0x8e8e93).setVisible(false));
     this.typingTweens = [];
-    this.bubble = scene.add.container(0, 0, [this.bubbleBg, this.bubbleText, ...this.typingDots]).setDepth(10000).setVisible(false);
+    this.alert = scene.add.text(0, 0, '', { fontSize: '28px', fontStyle: 'bold', color: '#ff4d4d' }).setOrigin(0.5).setVisible(false);
+    this.alertCount = 0;
+    this.puffClock = 0;
+    this.bubble = scene.add.container(0, 0, [this.bubbleBg, this.bubbleText, ...this.typingDots, this.alert]).setDepth(10000).setVisible(false);
 
     scene.add.existing(this);
   }
@@ -108,7 +112,22 @@ export class Character extends Phaser.GameObjects.Container {
     for (const dot of this.typingDots) dot.setVisible(false);
   }
 
+  // Show "‼️" above the bubble while others are chasing this character, with a count if there are several.
+  setAlert(count) {
+    if (count === this.alertCount) return this;
+    const grew = count > this.alertCount;
+    this.alertCount = count;
+    this.alertWobble?.remove();
+    if (!count) { this.alert.setVisible(false); return this; }
+
+    this.alert.setText(count > 1 ? `‼️×${count}` : '‼️').setVisible(true).setScale(1).setAngle(0);
+    if (grew) this.scene.tweens.add({ targets: this.alert, scale: { from: 1.8, to: 1 }, duration: 250, ease: 'Back.easeOut' });
+    this.alertWobble = this.scene.tweens.add({ targets: this.alert, angle: { from: -10, to: 10 }, duration: 140, yoyo: true, repeat: -1 });
+    return this;
+  }
+
   drawBubble(w, h, fill) {
+    this.alert.setY(-h - 30);   // sits just above whatever the bubble is showing
     this.bubbleBg.clear()
       .fillStyle(fill, 1)
       .fillRoundedRect(-w / 2, -h - 8, w, h, 12)
@@ -131,7 +150,7 @@ export class Character extends Phaser.GameObjects.Container {
   stepWander(dt) {
     // Ease toward cruising speed (e.g. after a knockback).
     const speed = Math.hypot(this.vx, this.vy) || 1;
-    const scale = Phaser.Math.Linear(speed, this.fleeing ? FLEE_SPEED : WANDER_SPEED, Math.min(1, dt * 2)) / speed;
+    const scale = Phaser.Math.Linear(speed, this.fleeSpeed || WANDER_SPEED, Math.min(1, dt * 2)) / speed;
     this.vx *= scale;
     this.vy *= scale;
 
@@ -162,10 +181,31 @@ export class Character extends Phaser.GameObjects.Container {
     const step = Math.min(dist, CHASE_SPEED * dt);
     this.x += (dx / dist) * step;
     this.y += (dy / dist) * step;
+
+    this.puffClock -= dt;
+    if (this.puffClock <= 0) {
+      this.puffClock = PUFF_EVERY;
+      this.puff(-dx / dist, -dy / dist);
+    }
+  }
+
+  // Leave a 💨 behind (bx, by is the unit vector pointing backward); it drifts back and fades.
+  puff(bx, by) {
+    const puff = this.scene.add.text(this.x + bx * 34, this.y + by * 34 + 8, '💨', { fontSize: '26px' })
+      .setOrigin(0.5).setDepth(this.y - 1).setFlipX(bx > 0).setScale(Phaser.Math.FloatBetween(0.6, 1));
+    this.scene.tweens.add({
+      targets: puff,
+      x: puff.x + bx * 40,
+      y: puff.y + by * 40,
+      alpha: 0,
+      scale: puff.scale * 0.4,
+      duration: 400,
+      onComplete: () => puff.destroy(),
+    });
   }
 
   // Turn away from `others` within FLEE_RADIUS (closer ones count more) and from nearby walls.
-  // Call before update() each frame while fleeing.
+  // Call before update() each frame while fleeSpeed > 0.
   steerAway(others, delta) {
     let ax = 0;
     let ay = 0;
@@ -185,8 +225,8 @@ export class Character extends Phaser.GameObjects.Container {
     const len = Math.hypot(ax, ay);
     if (len < 0.01) return;
     const turn = Math.min(1, (delta / 1000) * 4);
-    this.vx = Phaser.Math.Linear(this.vx, (ax / len) * FLEE_SPEED, turn);
-    this.vy = Phaser.Math.Linear(this.vy, (ay / len) * FLEE_SPEED, turn);
+    this.vx = Phaser.Math.Linear(this.vx, (ax / len) * this.fleeSpeed, turn);
+    this.vy = Phaser.Math.Linear(this.vy, (ay / len) * this.fleeSpeed, turn);
   }
 
   // Point the sword the way we're moving.

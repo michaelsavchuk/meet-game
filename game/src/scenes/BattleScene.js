@@ -4,7 +4,7 @@ import { roster } from '../roster.js';
 import { pickWord, tokenize } from '../words.js';
 import { Character, separate } from '../objects/Character.js';
 import { Button } from '../objects/Button.js';
-import { WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY } from '../config.js';
+import { WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED } from '../config.js';
 
 const LOG_LINES = 4;
 
@@ -59,11 +59,21 @@ export class BattleScene extends Phaser.Scene {
   }
 
   update(time, delta) {
-    const characters = [...this.fighters.values()].map((f) => f.character);
+    const fighters = [...this.fighters.values()];
+    const characters = fighters.map((f) => f.character);
     const alive = characters.filter((c) => !c.out);
     separate(characters, delta);
+    const chasers = new Map();   // target character -> number of characters chasing it
     for (const character of alive) {
-      if (character.fleeing) character.steerAway(alive.filter((c) => c !== character), delta);
+      if (character.target) chasers.set(character.target, (chasers.get(character.target) ?? 0) + 1);
+    }
+    // Players run away while typing a new word (word === null) and, a bit slower, while being chased.
+    for (const { character, word, out } of fighters) {
+      if (out) continue;
+      const chasedBy = chasers.get(character) ?? 0;
+      character.setAlert(chasedBy);
+      character.fleeSpeed = this.over ? 0 : Math.max(word === null ? FLEE_SPEED : 0, chasedBy ? CHASED_FLEE_SPEED : 0);
+      if (character.fleeSpeed) character.steerAway(alive.filter((c) => c !== character), delta);
     }
     for (const character of characters) character.update(time, delta);
   }
@@ -113,7 +123,6 @@ export class BattleScene extends Phaser.Scene {
     if (victim.word) {
       victim.word = null;
       victim.character.setTyping();
-      victim.character.fleeing = true;
     }
     this.revealWordLater(victim);
   }
@@ -123,7 +132,6 @@ export class BattleScene extends Phaser.Scene {
     fighter.revealTimer?.remove();
     fighter.revealTimer = this.time.delayedCall(WORD_DELAY, () => {
       fighter.revealTimer = null;
-      fighter.character.fleeing = false;
       if (this.over || fighter.out) return;
       fighter.word = pickWord(new Set([...this.fighters.values()].map((f) => f.word)));
       fighter.character.setBubble(fighter.word, { highlight: true, pop: true });

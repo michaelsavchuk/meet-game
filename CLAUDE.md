@@ -26,11 +26,14 @@ Phases, one scene each (`game/src/scenes/`):
    another player's word (whole word, case-insensitive) makes your character chase and hit them.
    Rules: 3 HP, 1 per hit. The victim keeps their word while attackers run at them, so several
    players can chase the same person. When a hit lands, the victim's word is cleared (`word = null`)
-   and their bubble shows an SMS-style "…" typing indicator, so nobody new can target them. While
-   typing they flee (`character.fleeing`, `steerAway()`: away from other players and walls, at
-   `FLEE_SPEED`, slower than chasers). Chasers
+   and their bubble shows an SMS-style "…" typing indicator, so nobody new can target them. Chasers
    already on the way still hit, and each hit restarts the `WORD_DELAY` ms before a new word appears.
+   Fleeing: BattleScene sets `character.fleeSpeed` every frame: `FLEE_SPEED` while typing,
+   `CHASED_FLEE_SPEED` while being chased (the faster if both), 0 otherwise. Fleeing characters
+   `steerAway()` from other players and walls; both speeds are well below `CHASE_SPEED`.
    One attack at a time per player (words typed mid-chase are ignored); typing your own word does nothing.
+   Chase visuals: targets show a wobbling "‼️" (with "×N" for several chasers; BattleScene recounts
+   chasers every frame and calls `setAlert()`), and chasers leave a 💨 trail (`puff()`).
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.
 3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" / Enter keeps the roster.
 
