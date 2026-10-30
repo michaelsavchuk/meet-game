@@ -23,6 +23,11 @@ const FLING_SCALE = 2.5;
 const FLING_SPINS = 3;
 const BLAST_SCALE = 2;        // the KO burst frames are 128×256 at scale 1
 const BLAST_INSET = 64 * BLAST_SCALE;   // keep the burst at least this far from a corner
+// A soft blue blob under the feet, like the arena's blue AO; it shrinks and fades as the figure leaves the ground.
+const SHADOW_COLOR = '20, 30, 110';   // r, g, b
+const SHADOW_ALPHA = 0.55;
+const SHADOW_SIZE = { w: 45, h: 14 };
+const SHADOW_LIFT = 110;   // px of height at which the shadow would vanish
 
 const SWORD = '🗡️';
 const SHIELD = '🛡️';
@@ -32,6 +37,23 @@ const SHIELD_Y = 8;
 const GRIP_FOLLOW = 18;     // how quickly the sword and shield catch up with the hop (higher = less lag)
 // Noto draws 🗡️ blade down-left; this turns it mostly upright, tipped slightly forward (mirrored when facing right).
 const SWORD_ANGLE = 120;
+
+// The shadow texture, drawn once per game: a radial gradient squashed into an ellipse by the image's scale.
+function shadowTexture(scene) {
+  if (!scene.textures.exists('shadow')) {
+    const size = 64;
+    const texture = scene.textures.createCanvas('shadow', size, size);
+    const ctx = texture.context;
+    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, `rgba(${SHADOW_COLOR}, 1)`);
+    gradient.addColorStop(0.5, `rgba(${SHADOW_COLOR}, 0.8)`);
+    gradient.addColorStop(1, `rgba(${SHADOW_COLOR}, 0)`);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+    texture.refresh();
+  }
+  return 'shadow';
+}
 
 // Where a character's position can be so it stands on the floor: top/bottom, and left/right at height y.
 function limits(y) {
@@ -90,7 +112,9 @@ export class Character extends Phaser.GameObjects.Container {
     this.vx = Math.cos(angle) * WANDER_SPEED;
     this.vy = Math.sin(angle) * WANDER_SPEED;
 
-    // The figure (emoji + sword) hops; the labels under it stay put.
+    // The figure (emoji + sword) hops; the shadow and labels under it stay put.
+    this.shadow = scene.add.image(0, FEET - 2, shadowTexture(scene)).setDisplaySize(SHADOW_SIZE.w, SHADOW_SIZE.h);
+    this.shadowScale = { x: this.shadow.scaleX, y: this.shadow.scaleY };
     this.emoji = scene.add.text(0, 0, player.emoji, { fontSize: '52px' }).setOrigin(0.5);
     this.sword = scene.add.text(HAND_X, SWORD_Y, SWORD, { fontSize: '38px' }).setOrigin(0.5).setVisible(false);
     this.shield = scene.add.text(-HAND_X, SHIELD_Y, SHIELD, { fontSize: '34px' }).setOrigin(0.5).setVisible(false);
@@ -98,7 +122,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.gripY = 0;   // where the sword and shield have caught up to in the hop (they trail it slightly)
     this.nameText = scene.add.text(0, 38, player.name, { fontSize: '16px', color: '#e8e8f0', fontStyle: 'bold' }).setOrigin(0.5, 0);
     this.hearts = scene.add.text(0, 58, '', { fontSize: '14px' }).setOrigin(0.5, 0).setVisible(false);
-    this.add([this.figure, this.nameText, this.hearts]);
+    this.add([this.shadow, this.figure, this.nameText, this.hearts]);
 
     // The bubble is its own object on a high depth so it's never hidden behind another character.
     this.bubbleBg = scene.add.graphics();
@@ -207,6 +231,7 @@ export class Character extends Phaser.GameObjects.Container {
     if (!this.out && !this.airborne) this.hop(Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y) / (dt || 1), dt);
     this.lastPos = { x: this.x, y: this.y };
     if (!this.out) this.setDepth(this.y);   // lower on screen = in front
+    this.updateShadow();
     // Clear of the top of a hop; it ignores the hop but flies along with a knockback so it never covers the figure.
     this.bubble.setPosition(this.x, this.y - 40 - HOP_HEIGHT + (this.airborne ? this.figure.y : 0));
   }
@@ -228,6 +253,13 @@ export class Character extends Phaser.GameObjects.Container {
     this.gripY = Phaser.Math.Linear(this.gripY, this.figure.y, Math.min(1, dt * GRIP_FOLLOW));
     this.setGripLag(this.gripY - this.figure.y);
     this.emoji.angle = this.shakeTween?.isPlaying() ? 0 : this.hopSide * this.hopTilt * lift;
+  }
+
+  // Shrink and fade the shadow the higher the figure is off the ground.
+  updateShadow() {
+    const ground = Phaser.Math.Clamp(1 + this.figure.y / SHADOW_LIFT, 0, 1);
+    const scale = 0.4 + 0.6 * ground;
+    this.shadow.setScale(this.shadowScale.x * scale, this.shadowScale.y * scale).setAlpha(SHADOW_ALPHA * ground);
   }
 
   // Offset the sword and shield from their resting spots by `lag` px of hop they haven't caught up with yet.
@@ -427,6 +459,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.setSword(false).setShield(false).setBubble(null).setAlert(0);
     this.hearts.setVisible(false);
     this.nameText.setVisible(false);
+    this.shadow.setVisible(false);   // nothing to cast it on once flying at the camera
     this.figure.setY(0).setAngle(0);
     this.emoji.setAngle(0);
     this.scene.tweens.killTweensOf(this.emoji);   // no hurt() flash: fly out solid
