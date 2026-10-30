@@ -110,5 +110,98 @@ function observeReactions() {
   }).observe(document.body, { childList: true, subtree: true });
 }
 
+// ---- Meet's built-in chat (meet.google.com) ----
+// Some calls use Meet's own chat panel instead of the Google Chat frame. Messages live in an
+// aria-live list; each child is a group of consecutive messages from one sender, with the name in a
+// header next to the timestamp. Your own groups have no name, so we use the signed-in account's name.
+function observeMeetChat() {
+  if (window.__meetNativeChatObserver) return;
+  window.__meetNativeChatObserver = true;
+
+  const MSG = 'div[data-message-id]';         // the pin button also carries data-message-id
+  const TEXT = '[jsname="dTKtvb"]';           // message body (fast path; minified token, may change)
+  const NAME = '.poVWob';                     // sender name (fast path; minified class, may change)
+  const TIME = /^\d{1,2}:\d{2}(\s?[AP]M)?$/i;
+  const HISTORY_MS = 30_000;                  // messages older than this when first seen are history
+  const DUPE_MS = 10_000;                     // same sender + text again within this is a re-render
+  const seen = new Set();                     // message ids
+  const seenEls = new WeakSet();              // elements (the id can change in place)
+  const recent = new Map();                   // "sender\ntext" -> when we last sent it
+  let selfName = null;
+
+  // The account chip ("Google Account: Name (email)") is on the pre-join page; remember it for the call.
+  function readSelfName() {
+    const label = document.querySelector('[aria-label^="Google Account:"]')?.getAttribute('aria-label');
+    const name = label?.replace(/^Google Account:\s*/, '').split(/\s*[\n(]/)[0].trim();
+    if (name) selfName = name;
+  }
+
+  // Ids look like "spaces/<space>/messages/<microseconds since epoch>".
+  function sentAt(id) {
+    const us = Number(id.split('/').pop());
+    return Number.isFinite(us) && us > 1e15 ? us / 1000 : null;
+  }
+
+  // The group is the aria-live list's direct child. Its name is the first text before the first
+  // message that isn't the timestamp; no name means it's one of your own messages.
+  function senderOf(el) {
+    const group = el.closest('[aria-live] > *');
+    if (!group) return null;
+    const fast = group.querySelector(NAME)?.innerText?.trim();
+    if (fast) return fast;
+    const walker = document.createTreeWalker(group, NodeFilter.SHOW_TEXT);
+    for (let n; (n = walker.nextNode());) {
+      if (n.parentElement.closest(MSG)) break;
+      const text = n.textContent.trim();
+      if (text && !TIME.test(text)) return text;
+    }
+    return null;
+  }
+
+  function bodyOf(el) {
+    // Fallback: message > bubble > content > body (the first child; later ones are the pin hint/button).
+    return el.querySelector(TEXT) ?? el.firstElementChild?.firstElementChild?.firstElementChild;
+  }
+
+  function parse(el) {
+    const name = senderOf(el);
+    return {
+      id: el.getAttribute('data-message-id'),
+      userId: name ? `meet:${name}` : 'meet:self',
+      sender: name || selfName || 'You',
+      text: bodyOf(el)?.innerText?.trim() ?? '',
+      receivedAt: new Date().toISOString(),
+    };
+  }
+
+  function scan() {
+    readSelfName();
+    const now = Date.now();
+    for (const [key, t] of recent) if (now - t > DUPE_MS) recent.delete(key);
+    document.querySelectorAll(MSG).forEach(el => {
+      const id = el.getAttribute('data-message-id');
+      if (seenEls.has(el) || seen.has(id)) return;
+      const at = sentAt(id);
+      if (at && now - at > HISTORY_MS) { seen.add(id); seenEls.add(el); return; }
+      const msg = parse(el);
+      if (!msg.text) return;              // body not rendered yet; catch it on the next mutation
+      seen.add(id);
+      seenEls.add(el);
+      // Meet re-renders a message under a new id (your own: temporary id, then the sent one), so drop
+      // a repeat of the same sender + text that shows up within DUPE_MS.
+      const key = `${msg.sender}\n${msg.text}`;
+      if (recent.has(key)) { console.log('[meet-chat native] skipped re-render', id, msg.text); return; }
+      recent.set(key, now);
+      send('chat-message', 'meet-chat-message', msg);
+      console.log('[meet-chat native]', msg.sender, ':', msg.text, id);
+    });
+  }
+
+  // Whatever is on screen at load is history, even if its id doesn't carry a timestamp.
+  readSelfName();
+  document.querySelectorAll(MSG).forEach(el => { seen.add(el.getAttribute('data-message-id')); seenEls.add(el); });
+  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true, characterData: true });
+}
+
 if (location.hostname === 'chat.google.com') observeChat();
-else if (location.hostname === 'meet.google.com') observeReactions();
+else if (location.hostname === 'meet.google.com') { observeReactions(); observeMeetChat(); }

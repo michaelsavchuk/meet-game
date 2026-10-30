@@ -9,7 +9,8 @@ extension/ --POST /messages, /reactions--> server/ --SSE /events--> game/ (Phase
 ```
 - `extension/chat-observer.js` is one content script that branches on hostname:
   `chat.google.com` (the chat frame Meet embeds, injected with `all_frames`) → chat messages;
-  `meet.google.com` (top frame) → reaction badges on video tiles. `background.js` routes each
+  `meet.google.com` (top frame) → reaction badges on video tiles, plus Meet's own built-in chat panel
+  (`observeMeetChat()`), which some calls use instead of the Chat frame. `background.js` routes each
   type to its own server endpoint.
 - `server/index.js` normalizes raw extension payloads into game events
   (`{ type: 'chat' | 'reaction', player: { id, name }, text | emoji, at }`), broadcasts them over
