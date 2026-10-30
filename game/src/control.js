@@ -59,7 +59,7 @@ function renderLobby({ players, canStart }) {
 
 function renderBattle({ over, winner, boost, maxHp, fighters, waiting, log }) {
   const alive = fighters.filter((f) => !f.out).length;
-  const summary = over ? `👑 ${winner} wins!` : `Battle · ${alive} of ${fighters.length} still standing`;
+  const summary = over ? `👑 ${winner} is the one!` : `Battle · ${alive} of ${fighters.length} still standing`;
   $('summary').replaceChildren(summary);
   if (boost && !over) $('summary').append(' · ', span(`⚡ sudden death, chases ×${boost}`, 'gold'));
 

@@ -297,7 +297,7 @@ export class BattleScene extends Phaser.Scene {
   win(winner) {
     this.over = true;
     this.winner = winner;
-    this.addLog(`👑 ${winner.name} wins`);
+    this.addLog(`👑 ${winner.name} is the one`);
     for (const f of this.fighters.values()) f.character.cancelChase();
   }
 
@@ -305,7 +305,12 @@ export class BattleScene extends Phaser.Scene {
     winner.character.setBubble('🏆 Winner!', { highlight: true });
     this.tweens.add({ targets: winner.character, scale: 1.6, duration: 500, ease: 'Back.easeOut' });
 
-    this.banner(`👑 ${winner.name} wins! 👑`, { color: '#ffd84d', persist: true, wave: true });
+    // One line if it fits at full size; otherwise the name gets its own line so a full name doesn't shrink it all.
+    const oneLine = `👑 ${winner.name} is the one! 👑`;
+    const probe = this.add.text(0, 0, oneLine, { fontFamily: DISPLAY_FONT, fontSize: `${BANNER_SIZE}px` });
+    const fits = probe.width <= WIDTH - 160;
+    probe.destroy();
+    this.banner(fits ? oneLine : `👑 ${winner.name} 👑\nis the one!`, { color: '#ffd84d', persist: true, wave: true });
     this.confetti();
   }
 
@@ -331,19 +336,27 @@ export class BattleScene extends Phaser.Scene {
     this.bannerObj?.destroy();
 
     // One text per character (emoji kept whole), laid out in a row, so each can fly in on its own.
-    const chars = [...new Intl.Segmenter().segment(text)].map((s) => s.segment);
-    const letters = chars.map((ch) => this.add.text(0, 0, ch, { fontFamily: DISPLAY_FONT, fontSize: `${BANNER_SIZE}px`, color }));
-    const width = letters.reduce((sum, letter) => sum + letter.width, 0);
-    const height = letters[0].height;
+    // A "\n" in the text starts another centered line.
+    const lines = text.split('\n').map((line) => [...new Intl.Segmenter().segment(line)].map((s) =>
+      this.add.text(0, 0, s.segment, { fontFamily: DISPLAY_FONT, fontSize: `${BANNER_SIZE}px`, color })));
+    const letters = lines.flat();
+    const lineWidth = (line) => line.reduce((sum, letter) => sum + letter.width, 0);
+    const width = Math.max(...lines.map(lineWidth));
+    const lineHeight = letters[0].height;
+    const height = lineHeight * lines.length;
     const scale = Math.min(1, (WIDTH - 160) / width);
     const barHeight = height * scale + BANNER_PADDING * 2;
-    const top = -height / 2;   // the letters' resting y (origin is their top-left), in the unscaled row
-    let x = -width / 2;
+    lines.forEach((line, row) => {
+      let x = -lineWidth(line) / 2;
+      for (const letter of line) {
+        letter.restY = -height / 2 + row * lineHeight;   // the letter's resting y (origin is its top-left), unscaled
+        letter.setPosition(x, letter.restY + barHeight / scale);   // starts below the bar, cropped away by updateBanner()
+        x += letter.width;
+      }
+    });
     letters.forEach((letter, i) => {
-      letter.setPosition(x, top + barHeight / scale);   // starts below the bar, cropped away by updateBanner()
-      x += letter.width;
       this.tweens.add({
-        targets: letter, y: top, delay: i * BANNER_STAGGER, duration: BANNER_FLY_MS, ease: 'Back.easeOut',
+        targets: letter, y: letter.restY, delay: i * BANNER_STAGGER, duration: BANNER_FLY_MS, ease: 'Back.easeOut',
         onComplete: () => { letter.landedAt = this.time.now; },
       });
     });
@@ -352,7 +365,7 @@ export class BattleScene extends Phaser.Scene {
     // Wider than the screen so the slanted ends stay off screen.
     const bar = this.add.rectangle(0, 0, WIDTH * 1.5, barHeight, BANNER_COLOR);
     this.bannerObj = this.add.container(WIDTH / 2, HEIGHT / 2, [bar, row]).setAngle(BANNER_ANGLE).setDepth(20000);
-    this.bannerState = { letters, top, clip: barHeight / 2 / scale, wave };
+    this.bannerState = { letters, clip: barHeight / 2 / scale, wave };
     this.updateBanner();
     this.cameras.main.shake(BANNER_SHAKE.duration, BANNER_SHAKE.intensity);
     this.bannerTimer = persist ? null : this.time.delayedCall(BANNER_MS, () => {
@@ -369,7 +382,7 @@ export class BattleScene extends Phaser.Scene {
     for (const letter of state.letters) {
       if (state.wave && letter.landedAt != null) {
         const t = (this.time.now - letter.landedAt) / 1000;
-        letter.y = state.top - Math.sin(t * Math.PI * 2 * BANNER_WAVE.hz) * BANNER_WAVE.amplitude;
+        letter.y = letter.restY - Math.sin(t * Math.PI * 2 * BANNER_WAVE.hz) * BANNER_WAVE.amplitude;
       }
       const from = Phaser.Math.Clamp(-state.clip - letter.y, 0, letter.height);
       const to = Phaser.Math.Clamp(state.clip - letter.y, 0, letter.height);
