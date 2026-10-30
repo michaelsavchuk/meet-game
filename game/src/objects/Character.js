@@ -1,15 +1,39 @@
 import * as Phaser from 'phaser';
-import { ARENA, WANDER_SPEED, CHASE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
+import { WIDTH, HEIGHT, ARENA, WANDER_SPEED, CHASE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
 
 const WALL_MARGIN = 120;   // while fleeing, walls closer than this push back so nobody gets cornered
 const PUFF_EVERY = 0.06;   // seconds between 💨 puffs while charging
+// Hops speed up with movement: one per HOP_STRIDE px travelled (~1.8/s while wandering), kept within these rates.
+const HOP_STRIDE = 40;
+const HOP_RATE = { min: 1.2, max: 7 };   // hops per second
+const HOP_HEIGHT = 12;
+const HOP_TILT = { min: 3, max: 7 };     // degrees; each hop leans the other way by a random amount in this range
+// Knockbacks launch the figure into a flip through the air; ground speed fades by AIR_DRAG per second meanwhile.
+const AIR_TIME = 0.55;     // seconds
+const AIR_HEIGHT = 70;     // px at the top of the arc
+const AIR_DRAG = 3;
+// A knockout flings the character off screen, spinning and growing as if flying at the camera.
+const FLING_DELAY = 120;      // ms of hit-stop before the launch
+const FLING_TIME = 1100;      // ms to cross FLING_DISTANCE at a steady speed (it's off screen well before)
+const GROW_TIME = 500;        // ms to reach FLING_SCALE
+const FLING_DISTANCE = 1600;  // px; far enough to leave the screen from anywhere
+const FLING_SCALE = 2.5;
+const FLING_SPINS = 3;
+const BLAST_SCALE = 2;        // the KO burst frames are 128×256 at scale 1
+const BLAST_INSET = 64 * BLAST_SCALE;   // keep the burst at least this far from a corner
 
 const SWORD = '🗡️';
 const SHIELD = '🛡️';
+const HAND_X = 32;          // sword in front of the emoji, shield behind
+const SWORD_Y = 4;
+const SHIELD_Y = 8;
+const GRIP_FOLLOW = 18;     // how quickly the sword and shield catch up with the hop (higher = less lag)
+// Noto draws 🗡️ blade down-left; this turns it mostly upright, tipped slightly forward (mirrored when facing right).
+const SWORD_ANGLE = 120;
 
-// Nudge wandering characters apart so they don't stack. Chasers and knocked-out characters are left alone.
+// Nudge wandering characters apart so they don't stack. Chasers, airborne and knocked-out characters are left alone.
 export function separate(characters, delta) {
-  const free = characters.filter((c) => !c.out && !c.chasing);
+  const free = characters.filter((c) => !c.out && !c.chasing && !c.airborne);
   const push = Math.min(1, (delta / 1000) * 4);
   for (let i = 0; i < free.length; i++) {
     for (let j = i + 1; j < free.length; j++) {
@@ -34,7 +58,12 @@ export class Character extends Phaser.GameObjects.Container {
   constructor(scene, player, { x, y } = {}) {
     super(scene, x ?? Phaser.Math.Between(ARENA.x, ARENA.x + ARENA.width), y ?? Phaser.Math.Between(ARENA.y, ARENA.y + ARENA.height));
     this.name = player.name;
-    this.phase = Math.random() * Math.PI * 2;   // so characters don't hop in sync
+    this.hopPhase = Math.random() * Math.PI;   // so characters don't hop in sync; one hop per π
+    this.hopSide = Math.random() < 0.5 ? -1 : 1;
+    this.hopTilt = Phaser.Math.FloatBetween(HOP_TILT.min, HOP_TILT.max);
+    this.speed = WANDER_SPEED;                 // smoothed px/s actually moved, drives the hop rate
+    this.lastPos = { x: this.x, y: this.y };   // position at the end of the previous update()
+    this.air = 0;                              // seconds left in a knockback flip (see knockback)
     this.out = false;
     this.target = null;
     this.fleeSpeed = 0;     // set by the scene; when > 0, moves at this speed and steers away (see steerAway)
@@ -46,9 +75,10 @@ export class Character extends Phaser.GameObjects.Container {
 
     // The figure (emoji + sword) hops; the labels under it stay put.
     this.emoji = scene.add.text(0, 0, player.emoji, { fontSize: '52px' }).setOrigin(0.5);
-    this.sword = scene.add.text(30, 6, SWORD, { fontSize: '30px' }).setOrigin(0.5).setVisible(false);
-    this.shield = scene.add.text(-30, 8, SHIELD, { fontSize: '28px' }).setOrigin(0.5).setVisible(false);
-    this.figure = scene.add.container(0, 0, [this.sword, this.shield, this.emoji]);
+    this.sword = scene.add.text(HAND_X, SWORD_Y, SWORD, { fontSize: '38px' }).setOrigin(0.5).setVisible(false);
+    this.shield = scene.add.text(-HAND_X, SHIELD_Y, SHIELD, { fontSize: '34px' }).setOrigin(0.5).setVisible(false);
+    this.figure = scene.add.container(0, 0, [this.emoji, this.sword, this.shield]);   // held items in front
+    this.gripY = 0;   // where the sword and shield have caught up to in the hop (they trail it slightly)
     this.nameText = scene.add.text(0, 38, player.name, { fontSize: '16px', color: '#e8e8f0', fontStyle: 'bold' }).setOrigin(0.5, 0);
     this.hearts = scene.add.text(0, 58, '', { fontSize: '14px' }).setOrigin(0.5, 0).setVisible(false);
     this.add([this.figure, this.nameText, this.hearts]);
@@ -64,6 +94,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.puffClock = 0;
     this.bubble = scene.add.container(0, 0, [this.bubbleBg, this.bubbleText, ...this.typingDots, this.alert]).setDepth(10000).setVisible(false);
 
+    this.face(this.vx < 0 ? -1 : 1);
     scene.add.existing(this);
   }
 
@@ -151,13 +182,71 @@ export class Character extends Phaser.GameObjects.Container {
   update(time, delta) {
     const dt = delta / 1000;
 
-    if (this.target) this.stepChase(time, dt);
+    if (this.airborne) this.stepAir(dt);
+    else if (this.target) this.stepChase(time, dt);
     else if (!this.out) this.stepWander(dt);
 
-    if (!this.out) this.figure.y = -Math.abs(Math.sin(time / 180 + this.phase)) * 12;  // hop
-    this.setDepth(this.y);                                                             // lower on screen = in front
-    this.bubble.setPosition(this.x, this.y - 40 + this.figure.y);
+    // Measured since last frame so separate() shoves and knockbacks count too.
+    if (!this.out && !this.airborne) this.hop(Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y) / (dt || 1), dt);
+    this.lastPos = { x: this.x, y: this.y };
+    if (!this.out) this.setDepth(this.y);   // lower on screen = in front
+    // Clear of the top of a hop; it ignores the hop but flies along with a knockback so it never covers the figure.
+    this.bubble.setPosition(this.x, this.y - 40 - HOP_HEIGHT + (this.airborne ? this.figure.y : 0));
   }
+
+  // Bob the figure (not the labels or bubble), faster the faster we're moving. `speed` is this frame's px/s.
+  // Each hop also leans the emoji (not the sword and shield) a little, alternating sides, upright again at
+  // take-off and landing.
+  hop(speed, dt) {
+    this.speed = Phaser.Math.Linear(this.speed, speed, Math.min(1, dt * 8));
+    const rate = Phaser.Math.Clamp(this.speed / HOP_STRIDE, HOP_RATE.min, HOP_RATE.max);
+    const phase = this.hopPhase + Math.PI * rate * dt;
+    if (phase >= Math.PI) {
+      this.hopSide = -this.hopSide;
+      this.hopTilt = Phaser.Math.FloatBetween(HOP_TILT.min, HOP_TILT.max);
+    }
+    this.hopPhase = phase % Math.PI;
+    const lift = Math.sin(this.hopPhase);
+    this.figure.y = -lift * HOP_HEIGHT;
+    this.gripY = Phaser.Math.Linear(this.gripY, this.figure.y, Math.min(1, dt * GRIP_FOLLOW));
+    this.setGripLag(this.gripY - this.figure.y);
+    this.emoji.angle = this.shakeTween?.isPlaying() ? 0 : this.hopSide * this.hopTilt * lift;
+  }
+
+  // Offset the sword and shield from their resting spots by `lag` px of hop they haven't caught up with yet.
+  setGripLag(lag) {
+    this.sword.y = SWORD_Y + lag;
+    this.shield.y = SHIELD_Y + lag;
+  }
+
+  // Fly back from a knockback: the figure arcs up and flips while the character drifts and slows down.
+  stepAir(dt) {
+    this.air = Math.max(0, this.air - dt);
+    const drag = Math.exp(-AIR_DRAG * dt);
+    this.vx *= drag;
+    this.vy *= drag;
+    this.move(dt);
+
+    const t = 1 - this.air / AIR_TIME;
+    this.figure.y = -4 * AIR_HEIGHT * t * (1 - t);
+    this.figure.angle = this.spin * 360 * t;
+    if (!this.airborne) this.land();
+  }
+
+  // Touch down with a squash, then carry on at walking pace instead of sliding off fast.
+  land() {
+    this.figure.setAngle(0).setY(0);
+    this.scene.tweens.add({ targets: this.figure, scaleX: { from: 1.3, to: 1 }, scaleY: { from: 0.7, to: 1 }, duration: 180, ease: 'Back.easeOut' });
+    const speed = Math.hypot(this.vx, this.vy) || 1;
+    const walk = this.fleeSpeed || WANDER_SPEED;
+    this.vx *= walk / speed;
+    this.vy *= walk / speed;
+    this.speed = walk;
+    this.hopPhase = 0;   // start the next hop from the ground
+    this.gripY = 0;
+  }
+
+  get airborne() { return this.air > 0; }
 
   stepWander(dt) {
     // Ease toward cruising speed (e.g. after a knockback).
@@ -166,13 +255,18 @@ export class Character extends Phaser.GameObjects.Container {
     this.vx *= scale;
     this.vy *= scale;
 
+    this.move(dt);
+    this.face(this.vx);
+  }
+
+  // Move by the velocity, bouncing off the arena walls.
+  move(dt) {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
     const right = ARENA.x + ARENA.width;
     const bottom = ARENA.y + ARENA.height;
     if (this.x < ARENA.x || this.x > right) { this.vx = -this.vx; this.x = Phaser.Math.Clamp(this.x, ARENA.x, right); }
     if (this.y < ARENA.y || this.y > bottom) { this.vy = -this.vy; this.y = Phaser.Math.Clamp(this.y, ARENA.y, bottom); }
-    this.face(this.vx);
   }
 
   stepChase(time, dt) {
@@ -219,6 +313,7 @@ export class Character extends Phaser.GameObjects.Container {
   // Turn away from `others` within FLEE_RADIUS (closer ones count more) and from nearby walls.
   // Call before update() each frame while fleeSpeed > 0.
   steerAway(others, delta) {
+    if (this.airborne) return;
     let ax = 0;
     let ay = 0;
     for (const other of others) {
@@ -245,8 +340,11 @@ export class Character extends Phaser.GameObjects.Container {
   face(dx) {
     if (Math.abs(dx) < 1) return;
     const right = dx > 0;
-    this.sword.setX(right ? 30 : -30).setScale(right ? -1 : 1, 1);
-    this.shield.setX(right ? -30 : 30);
+    if (right === this.facingRight) return;   // only on turning, so a swing tween isn't overwritten
+    this.facingRight = right;
+    this.swingTween?.remove();
+    this.sword.setX(right ? HAND_X : -HAND_X).setScale(right ? -1 : 1, 1).setAngle(right ? -SWORD_ANGLE : SWORD_ANGLE);
+    this.shield.setX(right ? -HAND_X : HAND_X);
   }
 
   get chasing() { return this.target != null; }
@@ -264,18 +362,26 @@ export class Character extends Phaser.GameObjects.Container {
 
   // ---- Combat effects ----
 
+  // Chop forward from the raised sword and back.
   swing() {
-    const dir = this.sword.scaleX < 0 ? 1 : -1;
-    this.scene.tweens.add({ targets: this.sword, angle: dir * 100, duration: 90, yoyo: true, ease: 'Quad.easeOut' });
+    const rest = this.facingRight ? -SWORD_ANGLE : SWORD_ANGLE;
+    this.swingTween?.remove();
+    this.sword.setAngle(rest);
+    this.swingTween = this.scene.tweens.add({ targets: this.sword, angle: rest + (this.facingRight ? 100 : -100), duration: 90, yoyo: true, ease: 'Quad.easeOut' });
   }
 
-  // Bounce away from (fromX, fromY); stepWander eases the speed back down.
+  // Get knocked away from (fromX, fromY), flipping through the air for AIR_TIME (see stepAir).
   knockback(fromX, fromY, force) {
     const dx = this.x - fromX;
     const dy = this.y - fromY;
     const dist = Math.hypot(dx, dy) || 1;
     this.vx = (dx / dist) * force;
     this.vy = (dy / dist) * force;
+    this.shakeTween?.remove();
+    this.emoji.setAngle(0);   // the whole figure flips instead
+    this.setGripLag(0);   // held tight through the flip
+    this.air = AIR_TIME;
+    this.spin = dx < 0 ? -1 : 1;   // backflip away from the hit
     return this;
   }
 
@@ -286,22 +392,66 @@ export class Character extends Phaser.GameObjects.Container {
 
   // A quick "nope" wobble, e.g. when a chat message didn't hit anyone.
   shakeHead() {
+    if (this.airborne) return this;
     this.shakeTween?.remove();
     this.figure.setAngle(0);
     this.shakeTween = this.scene.tweens.add({ targets: this.figure, angle: { from: -14, to: 14 }, duration: 70, yoyo: true, repeat: 2, onComplete: () => this.figure.setAngle(0) });
     return this;
   }
 
-  // Fall over, fade out, and stop moving.
-  knockOut() {
+  // Get flung off screen away from (fromX, fromY) and a bit upward, then blast out where we leave it.
+  // onGone() fires at that moment, for the scene's own effects.
+  knockOut(fromX, fromY, onGone) {
     this.out = true;
     this.cancelChase();
     this.shakeTween?.remove();
-    this.setSword(false).setShield(false).setBubble(null);
+    this.air = 0;
+    this.setSword(false).setShield(false).setBubble(null).setAlert(0);
     this.hearts.setVisible(false);
-    this.figure.y = 0;
-    this.scene.tweens.add({ targets: this.figure, angle: 90, duration: 300, ease: 'Bounce.easeOut' });
-    this.scene.tweens.add({ targets: this, alpha: 0.35, duration: 600 });
+    this.nameText.setVisible(false);
+    this.figure.setY(0).setAngle(0);
+    this.emoji.setAngle(0);
+    this.scene.tweens.killTweensOf(this.emoji);   // no hurt() flash: fly out solid
+    this.emoji.setAlpha(1);
+    this.setDepth(15000);   // over everyone else on the way out
+
+    const dx = this.x - fromX;
+    const dy = this.y - fromY;
+    const dist = Math.hypot(dx, dy) || 1;
+    const ux = dx / dist;
+    const uy = dy / dist - 0.8;
+    const len = Math.hypot(ux, uy) || 1;
+    const spin = ux < 0 ? -1 : 1;
+    this.scene.tweens.add({ targets: this.figure, angle: spin * 360 * FLING_SPINS, delay: FLING_DELAY, duration: FLING_TIME });
+    this.scene.tweens.add({ targets: this, scale: FLING_SCALE, delay: FLING_DELAY, duration: GROW_TIME, ease: 'Cubic.easeOut' });
+    this.scene.tweens.add({
+      targets: this,
+      x: this.x + (ux / len) * FLING_DISTANCE,
+      y: this.y + (uy / len) * FLING_DISTANCE,
+      delay: FLING_DELAY,
+      duration: FLING_TIME,
+      onUpdate: (tween) => {
+        if (!this.visible || (this.x > 0 && this.x < WIDTH && this.y > 0 && this.y < HEIGHT)) return;
+        this.setVisible(false);
+        tween.stop();
+        this.blast();
+        onGone?.();
+      },
+    });
+  }
+
+  // The 'ko' flame burst (loaded by BattleScene) on the screen edge we just left, its base on the edge and its
+  // tip pointing back into the arena.
+  blast() {
+    const x = Phaser.Math.Clamp(this.x, BLAST_INSET, WIDTH - BLAST_INSET);
+    const y = Phaser.Math.Clamp(this.y, BLAST_INSET, HEIGHT - BLAST_INSET);
+    const [bx, by, angle] =
+      this.x <= 0 ? [0, y, 90]
+      : this.x >= WIDTH ? [WIDTH, y, -90]
+      : this.y <= 0 ? [x, 0, 180]
+      : [x, HEIGHT, 0];
+    this.scene.add.sprite(bx, by, 'ko').setOrigin(0.5, 1).setAngle(angle).setScale(BLAST_SCALE).setDepth(20000)
+      .play('ko').once('animationcomplete', (_anim, _frame, sprite) => sprite.destroy());
   }
 
   destroy(fromScene) {

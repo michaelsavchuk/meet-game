@@ -49,9 +49,11 @@ Phases, one scene each (`game/src/scenes/`):
 3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" / Enter keeps the roster.
 
 `HudScene` runs on top of everything (connection status, dev key hints). Other pieces:
-`roster.js` (players across rounds, name → emoji), `objects/Character.js` (bouncing emoji, sword,
-bubble, hearts, chase/hit/knock-out, `separate()` to keep characters from stacking),
-`objects/Button.js`, `config.js` (HP, speeds, sudden death timing, arena bounds and other tuning).
+`roster.js` (players across rounds, name → emoji), `objects/Character.js` (emoji whose hop rate follows
+its speed, sword, bubble, hearts, chase/hit, `separate()` to keep characters from stacking; a knockback flips
+the figure through the air, and a knockout flings it off screen into the `game/assets/ko.png` burst that
+BattleScene preloads), `objects/Button.js`, `config.js` (HP, speeds, sudden death timing, arena bounds and
+other tuning; animation tuning lives at the top of Character.js).
 
 ## Conventions
 - No dependencies beyond Phaser and no build step: the server uses only Node built-ins, and the

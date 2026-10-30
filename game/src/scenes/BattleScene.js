@@ -10,6 +10,7 @@ import {
 } from '../config.js';
 
 const LOG_LINES = 4;
+const KO_FRAMES = { frameWidth: 128, frameHeight: 256 };   // assets/ko.png: a strip of 6 flame-burst frames
 const MISS_COLORS = { 'so close!': '#ffd84d', '❌': '#ffffff' };
 
 // Phase 2: everyone gets a word. Typing another player's word sends your character to attack them.
@@ -19,7 +20,13 @@ export class BattleScene extends Phaser.Scene {
     super('battle');
   }
 
+  preload() {
+    this.load.spritesheet('ko', '/assets/ko.png', KO_FRAMES);
+  }
+
   create() {
+    // The burst where a knocked-out character leaves the screen (Character.blast): a few rapid loops, then gone.
+    if (!this.anims.exists('ko')) this.anims.create({ key: 'ko', frames: this.anims.generateFrameNumbers('ko'), frameRate: 30, repeat: 2 });
     this.over = false;
     this.log = [];
     // name -> { name, character, hp, word, lastWord, out, revealTimer, parries }. After a hit, word is null
@@ -231,7 +238,9 @@ export class BattleScene extends Phaser.Scene {
   knockOut(victim, by) {
     victim.out = true;
     victim.revealTimer?.remove();
-    victim.character.knockOut();
+    // A big shake when they blast off the screen edge.
+    victim.character.knockOut(by.character.x, by.character.y, () => this.cameras.main.shake(450, 0.025));
+    this.cameras.main.shake(300, 0.015);
     this.addLog(`💀 ${by.name} knocked out ${victim.name}`);
     for (const f of this.fighters.values()) {
       if (f.character.target === victim.character) f.character.cancelChase();
