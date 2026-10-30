@@ -11,6 +11,20 @@ import {
 const LOG_LINES = 30;   // shown on the control page
 const KO_FRAMES = { frameWidth: 128, frameHeight: 256 };   // assets/ko.png: a strip of 6 flame-burst frames
 const MISS_COLORS = { 'so close!': '#ffd84d', '❌': '#ffffff' };
+// Banners ("Type to Fight!", "Sudden death!", the winner): big text on a slanted dark blue bar across the screen. The bar
+// cuts in and out with no fades, with a small screen shake as it appears; its letters fly up into it one after another,
+// clipped to the bar. The winner's letters then keep bobbing in a wave.
+const BANNER_SIZE = 88;          // px font size; long text is scaled down to fit
+const BANNER_ANGLE = -4;         // degrees
+const BANNER_PADDING = 24;       // px of bar above and below the text
+const BANNER_MS = 1600;          // how long a flash banner stays up
+const BANNER_STAGGER = 50;       // ms between letters starting to fly in
+const BANNER_FLY_MS = 320;       // ms for each letter to fly in
+const BANNER_WAVE = { amplitude: 10, hz: 1.2 };   // the winner's letters: px up and down, cycles per second
+const BANNER_SHAKE = { duration: 180, intensity: 0.008 };
+const BANNER_COLOR = 0x0b0e2a;   // very dark blue, like the arena's AO
+const CONFETTI_BURST = 40;        // pieces when the winner is announced
+const CONFETTI_EVERY = 60;        // ms between pieces after that, until back in the lobby
 
 // Phase 2: everyone gets a word. Typing another player's word sends your character to attack them.
 // Last one standing wins (phase 3: the winner banner, then back to the lobby).
@@ -47,7 +61,7 @@ export class BattleScene extends Phaser.Scene {
       this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, lastWord: null, out: false, revealTimer: null, parries: new Set() });
     }
 
-    this.banner('Fight! ⚔️');
+    this.banner('Type to Fight!');
 
     listen(this, { chat: this.onChat, reaction: this.onReaction });
 
@@ -108,6 +122,7 @@ export class BattleScene extends Phaser.Scene {
 
   update(time, delta) {
     this.updateSuddenDeath(time);
+    this.updateBanner();
     const fighters = [...this.fighters.values()];
     const characters = fighters.map((f) => f.character);
     const alive = characters.filter((c) => !c.out);
@@ -260,29 +275,34 @@ export class BattleScene extends Phaser.Scene {
   knockOut(victim, by) {
     victim.out = true;
     victim.revealTimer?.remove();
-    // A big shake when they blast off the screen edge.
-    victim.character.knockOut(by.character.x, by.character.y, () => this.cameras.main.shake(450, 0.025));
+    const alive = this.alive();
+    const winner = alive.length === 1 ? alive[0] : null;
+    // A big shake when they blast off the screen edge; if they were the last opponent, the celebration starts then.
+    victim.character.knockOut(by.character.x, by.character.y, () => {
+      this.cameras.main.shake(450, 0.025);
+      if (winner) this.celebrate(winner);
+    });
     this.cameras.main.shake(300, 0.015);
     this.addLog(`💀 ${by.name} knocked out ${victim.name}`);
     for (const f of this.fighters.values()) {
       if (f.character.target === victim.character) f.character.cancelChase();
     }
-
-    const alive = this.alive();
-    if (alive.length === 1) this.win(alive[0]);
+    if (winner) this.win(winner);
   }
 
+  // The round ends as soon as the last opponent is knocked out; celebrate() follows once they've left the screen.
   win(winner) {
     this.over = true;
     this.winner = winner;
     this.addLog(`👑 ${winner.name} wins`);
     for (const f of this.fighters.values()) f.character.cancelChase();
+  }
+
+  celebrate(winner) {
     winner.character.setBubble('🏆 Winner!', { highlight: true });
     this.tweens.add({ targets: winner.character, scale: 1.6, duration: 500, ease: 'Back.easeOut' });
 
-    const shade = this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, 200, 0x000000, 0.55).setDepth(20000);
-    const title = this.add.text(WIDTH / 2, HEIGHT / 2, `👑 ${winner.name} wins! 👑`, { fontFamily: DISPLAY_FONT, fontSize: '64px', color: '#ffd84d' }).setOrigin(0.5).setDepth(20001);
-    this.tweens.add({ targets: [shade, title], alpha: { from: 0, to: 1 }, duration: 400 });
+    this.banner(`👑 ${winner.name} wins! 👑`, { color: '#ffd84d', persist: true, wave: true });
     this.confetti();
   }
 
@@ -301,9 +321,57 @@ export class BattleScene extends Phaser.Scene {
     if (this.log.length > LOG_LINES) this.log.shift();
   }
 
-  banner(text) {
-    const t = this.add.text(WIDTH / 2, HEIGHT / 2, text, { fontFamily: DISPLAY_FONT, fontSize: '96px', color: '#ffffff' }).setOrigin(0.5).setDepth(20000);
-    this.tweens.add({ targets: t, scale: { from: 0.5, to: 1.2 }, alpha: { from: 1, to: 0 }, duration: 1200, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
+  // Cut to a banner (replacing any still showing), which cuts away after BANNER_MS unless `persist`.
+  // `wave` keeps the letters bobbing once they're in.
+  banner(text, { color = '#ffffff', persist = false, wave = false } = {}) {
+    this.bannerTimer?.remove();
+    this.bannerObj?.destroy();
+
+    // One text per character (emoji kept whole), laid out in a row, so each can fly in on its own.
+    const chars = [...new Intl.Segmenter().segment(text)].map((s) => s.segment);
+    const letters = chars.map((ch) => this.add.text(0, 0, ch, { fontFamily: DISPLAY_FONT, fontSize: `${BANNER_SIZE}px`, color }));
+    const width = letters.reduce((sum, letter) => sum + letter.width, 0);
+    const height = letters[0].height;
+    const scale = Math.min(1, (WIDTH - 160) / width);
+    const barHeight = height * scale + BANNER_PADDING * 2;
+    const top = -height / 2;   // the letters' resting y (origin is their top-left), in the unscaled row
+    let x = -width / 2;
+    letters.forEach((letter, i) => {
+      letter.setPosition(x, top + barHeight / scale);   // starts below the bar, cropped away by updateBanner()
+      x += letter.width;
+      this.tweens.add({
+        targets: letter, y: top, delay: i * BANNER_STAGGER, duration: BANNER_FLY_MS, ease: 'Back.easeOut',
+        onComplete: () => { letter.landedAt = this.time.now; },
+      });
+    });
+    const row = this.add.container(0, 0, letters).setScale(scale);
+
+    // Wider than the screen so the slanted ends stay off screen.
+    const bar = this.add.rectangle(0, 0, WIDTH * 1.5, barHeight, BANNER_COLOR);
+    this.bannerObj = this.add.container(WIDTH / 2, HEIGHT / 2, [bar, row]).setAngle(BANNER_ANGLE).setDepth(20000);
+    this.bannerState = { letters, top, clip: barHeight / 2 / scale, wave };
+    this.updateBanner();
+    this.cameras.main.shake(BANNER_SHAKE.duration, BANNER_SHAKE.intensity);
+    this.bannerTimer = persist ? null : this.time.delayedCall(BANNER_MS, () => {
+      this.bannerObj.destroy();
+      this.bannerObj = this.bannerState = null;
+    });
+  }
+
+  // Every frame: bob a waving banner's landed letters, and crop each letter to the bar (they only move along its
+  // height, so a crop of the part outside ±clip is the same as clipping to the bar).
+  updateBanner() {
+    const state = this.bannerState;
+    if (!state) return;
+    for (const letter of state.letters) {
+      if (state.wave && letter.landedAt != null) {
+        const t = (this.time.now - letter.landedAt) / 1000;
+        letter.y = state.top - Math.sin(t * Math.PI * 2 * BANNER_WAVE.hz) * BANNER_WAVE.amplitude;
+      }
+      const from = Phaser.Math.Clamp(-state.clip - letter.y, 0, letter.height);
+      const to = Phaser.Math.Clamp(state.clip - letter.y, 0, letter.height);
+      letter.setVisible(to > from).setCrop(0, from, letter.width, to - from);
+    }
   }
 
   floatText(x, y, text, color) {
@@ -312,18 +380,22 @@ export class BattleScene extends Phaser.Scene {
     return t;
   }
 
+  // A burst of confetti, then a steady fall until the scene ends (back to the lobby).
   confetti() {
-    for (let i = 0; i < 40; i++) {
-      const t = this.add.text(Phaser.Math.Between(0, WIDTH), -40, Phaser.Utils.Array.GetRandom(['🎉', '✨', '🎊', '⭐']), { fontSize: '32px' }).setDepth(19999);
-      this.tweens.add({
-        targets: t,
-        y: HEIGHT + 40,
-        angle: Phaser.Math.Between(-360, 360),
-        delay: Phaser.Math.Between(0, 1500),
-        duration: Phaser.Math.Between(1800, 3000),
-        onComplete: () => t.destroy(),
-      });
-    }
+    for (let i = 0; i < CONFETTI_BURST; i++) this.dropConfetti(Phaser.Math.Between(0, 1500));
+    this.time.addEvent({ delay: CONFETTI_EVERY, loop: true, callback: () => this.dropConfetti() });
+  }
+
+  dropConfetti(delay = 0) {
+    const t = this.add.text(Phaser.Math.Between(0, WIDTH), -40, Phaser.Utils.Array.GetRandom(['🎉', '✨', '🎊', '⭐']), { fontSize: '32px' }).setDepth(19999);
+    this.tweens.add({
+      targets: t,
+      y: HEIGHT + 40,
+      angle: Phaser.Math.Between(-360, 360),
+      delay,
+      duration: Phaser.Math.Between(1800, 3000),
+      onComplete: () => t.destroy(),
+    });
   }
 
   backToLobby() {
