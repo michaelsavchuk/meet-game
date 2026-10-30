@@ -14,7 +14,7 @@ const STATIC = {
   '/': path.join(ROOT, 'game'),
   '/vendor/': path.join(ROOT, 'node_modules', 'phaser', 'dist'),
 };
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.ttf': 'font/ttf' };
 
 // ---- Normalizing: every game event has { type, player: { id, name }, at, ... } ----
 // Chat and reactions identify people differently (Chat user id vs. Meet participant id),

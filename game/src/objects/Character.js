@@ -55,7 +55,8 @@ export class Character extends Phaser.GameObjects.Container {
 
     // The bubble is its own object on a high depth so it's never hidden behind another character.
     this.bubbleBg = scene.add.graphics();
-    this.bubbleText = scene.add.text(0, 0, '', { fontSize: '22px', color: '#1d1f27', fontStyle: 'bold' }).setOrigin(0.5);
+    // Bubbles are sized to their text, so they use a shorter test string than TEST_STRING: 🌞 is as tall as most emoji.
+    this.bubbleText = scene.add.text(0, 0, '', { fontSize: '22px', color: '#1d1f27', fontStyle: 'bold', testString: '|MÉqgy🌞' }).setOrigin(0.5);
     this.typingDots = [-14, 0, 14].map((dx) => scene.add.circle(dx, -26, 5, 0x8e8e93).setVisible(false));
     this.typingTweens = [];
     this.alert = scene.add.text(0, 0, '', { fontSize: '28px', fontStyle: 'bold', color: '#ff4d4d' }).setOrigin(0.5).setVisible(false);

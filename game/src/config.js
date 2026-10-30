@@ -1,6 +1,11 @@
 // Gameplay tuning in one place.
 export const WIDTH = 1280;
 export const HEIGHT = 720;
+// Default for all game text (main.js). Noto Color Emoji only covers emoji code points, so other text stays Courier.
+export const FONT_FAMILY = "'Noto Color Emoji', Courier";
+// Phaser sizes a text's canvas from this string's ascent/descent. Its default ('|MÉqgy') is shorter than Noto
+// emoji, which clipped their tops; 🏀 and 🤯 reach the font's highest and lowest points.
+export const TEST_STRING = '|MÉqgy🏀🤯';
 
 // Area characters roam in, by character position. Leaves room for bubbles under the title
 // (~100px above a character) and the name/hearts and lobby buttons below (~75px under one).

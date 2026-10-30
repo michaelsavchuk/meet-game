@@ -6,6 +6,14 @@
   <title>Meet Game</title>
   <style>
     html, body { margin: 0; height: 100%; background: #111; overflow: hidden; }
+    /* Google's Noto Color Emoji (github.com/googlefonts/noto-emoji, 2D/fonts/Noto-COLRv1.ttf) so emoji look
+       the same on every machine. unicode-range keeps it to emoji: the font also has glyphs for digits, # and *. */
+    @font-face {
+      font-family: 'Noto Color Emoji';
+      src: url('/fonts/Noto-COLRv1.ttf') format('truetype');
+      unicode-range: U+00A9, U+00AE, U+200D, U+203C, U+2049, U+20E3, U+2122, U+2139, U+2194-21AA, U+231A-23FF,
+        U+24C2, U+25AA-27BF, U+2934-2935, U+2B05-2B55, U+3030, U+303D, U+3297, U+3299, U+FE0F, U+1F000-1FAFF, U+E0020-E007F;
+    }
   </style>
   <script type="importmap">
     { "imports": { "phaser": "/vendor/phaser.esm.js" } }

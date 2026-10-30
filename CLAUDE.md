@@ -59,6 +59,8 @@ bubble, hearts, chase/hit/knock-out, `separate()` to keep characters from stacki
 - **Phaser 4** (4.2.x), not Phaser 3. Most basic APIs match, but check v4 docs/source in
   `node_modules/phaser` before assuming a v3 API exists.
 - Game canvas is a fixed 1280×720, scaled with `Scale.FIT`. Keep text large enough to read in a screen share.
+- Emoji use Google's Noto Color Emoji (`game/fonts/Noto-COLRv1.ttf`, `@font-face` in `index.html`). `main.js` makes
+  `FONT_FAMILY` the default for every `scene.add.text()` and loads the font before the game starts.
 - Commit directly to `main`; no feature branches for now.
 
 ## Running and testing
