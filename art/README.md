@@ -9,13 +9,19 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
 `execute_blender_code` for bulk changes (150 tiles, 31 materials).
 
 ## Scene layout
-- **`Arena` collection**: everything the camera sees. 150 **linked duplicates** (they share mesh data with the pack
+- **`Arena` collection**: everything the camera sees. 226 **linked duplicates** (they share mesh data with the pack
   originals, so editing an original's mesh or material updates every copy):
   - Floor: 13×8 grid of 1 m tiles centered on the origin (x −6..6, y −3.5..3.5). About 15% are `floor-detail`,
     chosen with `random.Random(7)` so a rebuild comes out the same.
   - Walls: a ring at x = ±7, y = ±4.5. Straight runs use `wall-half` (trim on its local −Y face), turned with
-    `rotation_euler.z` so the trim faces the floor: back 0, front π, left π/2, right −π/2. Corners use `wall`
-    (trim on all sides).
+    `rotation_euler.z` so the trim faces the floor: back 0, front π, left π/2, right −π/2. Corners use
+    `wall-corner`, a custom asset (in `Collection`): a `dirt` block with the pack's `column` scaled to
+    0.3×0.3×1.0 m in its −X/−Y corner. Each corner is turned so the pillar sits at the floor's inner corner:
+    back-right 0, back-left π/2, front-left π, front-right −π/2.
+    To revert to the original full `wall` corners, run this for each corner object: `o.data = bpy.data.meshes[o['orig_mesh']]`,
+    then `o.rotation_euler.z = o['orig_rot_z']`. The objects are `wall.001`–`wall.004`.
+  - Dirt: 76 `dirt` blocks (random 90° turns, `random.Random(11)`) filling the ground outside the walls. They're placed only
+    where a tile is in view, so no world background shows in the render. Re-run that placement if the camera moves.
   - All pack objects carry `rotation_euler.x = 90°` and `scale = 0.01` from the FBX import. Keep that when
     placing new copies.
 - **`Collection`**: the original pack assets (props, characters, weapons, every wall/floor variant), laid out in a
