@@ -22,11 +22,13 @@ export class BattleScene extends Phaser.Scene {
 
   preload() {
     this.load.spritesheet('ko', '/assets/ko.png', KO_FRAMES);
+    if (!this.textures.exists('arena')) this.load.image('arena', '/assets/arena.png');
   }
 
   create() {
     // The burst where a knocked-out character leaves the screen (Character.blast): a few rapid loops, then gone.
     if (!this.anims.exists('ko')) this.anims.create({ key: 'ko', frames: this.anims.generateFrameNumbers('ko'), frameRate: 30, repeat: 2 });
+    this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
     this.over = false;
     this.log = [];
     // name -> { name, character, hp, word, lastWord, out, revealTimer, parries }. After a hit, word is null

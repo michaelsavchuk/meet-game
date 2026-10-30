@@ -48,6 +48,9 @@ Phases, one scene each (`game/src/scenes/`):
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.
 3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" / Enter keeps the roster.
 
+`art/arena.blend` renders the arena backdrop to `game/assets/arena.png` (Kenney Mini Dungeon tiles, flat texture +
+blue AO). Read `art/README.md` before editing it: layout, camera, and the shared `Toon Style` settings node.
+
 `HudScene` runs on top of everything (connection status, dev key hints). Other pieces:
 `roster.js` (players across rounds, name → emoji), `objects/Character.js` (emoji whose hop rate follows
 its speed, sword, bubble, hearts, chase/hit, `separate()` to keep characters from stacking; a knockback flips

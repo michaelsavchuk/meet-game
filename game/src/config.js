@@ -7,9 +7,19 @@ export const FONT_FAMILY = "'Noto Color Emoji', Courier";
 // emoji, which clipped their tops; 🏀 and 🤯 reach the font's highest and lowest points.
 export const TEST_STRING = '|MÉqgy🏀🤯';
 
-// Area characters roam in, by character position. Leaves room for bubbles under the title
-// (~100px above a character) and the name/hearts and lobby buttons below (~75px under one).
-export const ARENA = { x: 60, y: 200, width: WIDTH - 120, height: HEIGHT - 355 };
+// The floor of assets/arena.png (rendered from art/arena.blend), in screen px, where characters' feet stay.
+// Perspective makes it a trapezoid: `back` and `front` are its left/right edges at y = top and y = bottom
+// (bottom is where the front wall starts hiding the floor). Re-measure if the Blender camera moves.
+export const ARENA = { top: 108, bottom: 675, back: { left: 151, right: 1129 }, front: { left: 69, right: 1211 } };
+
+// The floor's left/right edges at screen y.
+export function arenaEdges(y) {
+  const t = (y - ARENA.top) / (ARENA.bottom - ARENA.top);
+  return {
+    left: ARENA.back.left + (ARENA.front.left - ARENA.back.left) * t,
+    right: ARENA.back.right + (ARENA.front.right - ARENA.back.right) * t,
+  };
+}
 // Characters closer than this get nudged apart so names and bubbles stay readable. Wider than tall
 // because word bubbles are.
 export const PERSONAL_SPACE = { x: 140, y: 110 };

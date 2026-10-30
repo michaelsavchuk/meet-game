@@ -1,7 +1,9 @@
 import * as Phaser from 'phaser';
-import { WIDTH, HEIGHT, ARENA, WANDER_SPEED, CHASE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
+import { WIDTH, HEIGHT, ARENA, arenaEdges, WANDER_SPEED, CHASE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
 
 const WALL_MARGIN = 120;   // while fleeing, walls closer than this push back so nobody gets cornered
+const FEET = 24;           // the emoji's bottom, below the character's position; feet stay on the ARENA floor
+const HALF_WIDTH = 26;     // keeps the emoji's sides off the side walls
 const PUFF_EVERY = 0.06;   // seconds between 💨 puffs while charging
 // Hops speed up with movement: one per HOP_STRIDE px travelled (~1.8/s while wandering), kept within these rates.
 const HOP_STRIDE = 40;
@@ -31,6 +33,20 @@ const GRIP_FOLLOW = 18;     // how quickly the sword and shield catch up with th
 // Noto draws 🗡️ blade down-left; this turns it mostly upright, tipped slightly forward (mirrored when facing right).
 const SWORD_ANGLE = 120;
 
+// Where a character's position can be so it stands on the floor: top/bottom, and left/right at height y.
+function limits(y) {
+  const { left, right } = arenaEdges(y + FEET);
+  return { top: ARENA.top - FEET, bottom: ARENA.bottom - FEET, left: left + HALF_WIDTH, right: right - HALF_WIDTH };
+}
+
+// A random spot on the floor.
+function randomSpot() {
+  const { top, bottom } = limits(0);
+  const y = Phaser.Math.Between(top, bottom);
+  const { left, right } = limits(y);
+  return { x: Phaser.Math.Between(left, right), y };
+}
+
 // Nudge wandering characters apart so they don't stack. Chasers, airborne and knocked-out characters are left alone.
 export function separate(characters, delta) {
   const free = characters.filter((c) => !c.out && !c.chasing && !c.airborne);
@@ -56,7 +72,8 @@ export function separate(characters, delta) {
 // or chasing a target set with chase().
 export class Character extends Phaser.GameObjects.Container {
   constructor(scene, player, { x, y } = {}) {
-    super(scene, x ?? Phaser.Math.Between(ARENA.x, ARENA.x + ARENA.width), y ?? Phaser.Math.Between(ARENA.y, ARENA.y + ARENA.height));
+    const spot = randomSpot();
+    super(scene, x ?? spot.x, y ?? spot.y);
     this.name = player.name;
     this.hopPhase = Math.random() * Math.PI;   // so characters don't hop in sync; one hop per π
     this.hopSide = Math.random() < 0.5 ? -1 : 1;
@@ -263,10 +280,10 @@ export class Character extends Phaser.GameObjects.Container {
   move(dt) {
     this.x += this.vx * dt;
     this.y += this.vy * dt;
-    const right = ARENA.x + ARENA.width;
-    const bottom = ARENA.y + ARENA.height;
-    if (this.x < ARENA.x || this.x > right) { this.vx = -this.vx; this.x = Phaser.Math.Clamp(this.x, ARENA.x, right); }
-    if (this.y < ARENA.y || this.y > bottom) { this.vy = -this.vy; this.y = Phaser.Math.Clamp(this.y, ARENA.y, bottom); }
+    const { top, bottom } = limits(this.y);
+    if (this.y < top || this.y > bottom) { this.vy = -this.vy; this.y = Phaser.Math.Clamp(this.y, top, bottom); }
+    const { left, right } = limits(this.y);
+    if (this.x < left || this.x > right) { this.vx = -this.vx; this.x = Phaser.Math.Clamp(this.x, left, right); }
   }
 
   stepChase(time, dt) {
@@ -326,8 +343,9 @@ export class Character extends Phaser.GameObjects.Container {
       ay += (dy / dist) * weight;
     }
     const wall = (gap) => Math.max(0, (WALL_MARGIN - gap) / WALL_MARGIN);
-    ax += wall(this.x - ARENA.x) - wall(ARENA.x + ARENA.width - this.x);
-    ay += wall(this.y - ARENA.y) - wall(ARENA.y + ARENA.height - this.y);
+    const { top, bottom, left, right } = limits(this.y);
+    ax += wall(this.x - left) - wall(right - this.x);
+    ay += wall(this.y - top) - wall(bottom - this.y);
 
     const len = Math.hypot(ax, ay);
     if (len < 0.01) return;

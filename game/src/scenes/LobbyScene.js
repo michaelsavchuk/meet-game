@@ -13,8 +13,13 @@ export class LobbyScene extends Phaser.Scene {
     super('lobby');
   }
 
+  preload() {
+    if (!this.textures.exists('arena')) this.load.image('arena', '/assets/arena.png');
+  }
+
   create() {
     this.characters = new Map();   // name -> Character
+    this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
 
     this.add.text(WIDTH / 2, 48, 'Type anything in chat to join!', { fontSize: '40px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
     this.add.text(WIDTH / 2, 96, 'React with any emoji to change your character', { fontSize: '22px', color: '#aab0c8' }).setOrigin(0.5);
