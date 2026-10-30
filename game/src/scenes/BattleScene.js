@@ -3,6 +3,7 @@ import { listen, simulateChat, simulateReaction, FAKE_EMOJI } from '../bridge.js
 import { roster } from '../roster.js';
 import { pickWord, tokenize, nearMiss } from '../words.js';
 import { Character, separate } from '../objects/Character.js';
+import { SpeedLines } from '../objects/SpeedLines.js';
 import {
   WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED, CHASE_SPEED, CLASH_KNOCKBACK,
   DISPLAY_FONT, SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX,
@@ -51,6 +52,7 @@ export class BattleScene extends Phaser.Scene {
     this.fighters = new Map();
     this.lastHitAt = this.time.now;   // for sudden death
     this.suddenDeath = 0;             // 0 = off, then 1, 2, ... as chases speed up
+    this.speedLines = new SpeedLines(this);
 
     // Everyone in the roster when the round starts plays; anyone who joins later waits for the next round.
     const taken = new Set();
@@ -254,6 +256,7 @@ export class BattleScene extends Phaser.Scene {
     if (level === this.suddenDeath) return;
     if (level === 1 && this.suddenDeath === 0) this.banner('⚡ Sudden death!');
     this.suddenDeath = level;
+    this.speedLines.setLevel(level / max);
   }
 
   // After WORD_DELAY, give the fighter a fresh word (they're attackable again).

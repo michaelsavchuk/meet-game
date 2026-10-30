@@ -43,7 +43,8 @@ Phases, one scene each (`game/src/scenes/`):
    nobody can pre-type a counter); other chasers still hit.
    Sudden death (`updateSuddenDeath()`): after `SUDDEN_DEATH_AFTER` ms without a hit (parries don't count),
    a banner shows and every chase gets faster each `SUDDEN_DEATH_STEP` ms, up to ×`SUDDEN_DEATH_MAX`, until
-   counters can't keep up. The next hit resets it.
+   counters can't keep up, with yellow anime action lines flickering in the corners (`objects/SpeedLines.js`,
+   more and longer as it speeds up). The next hit resets it.
    Miss feedback (`missReason()`): a fighter's message that attacks nobody shakes their head and floats a
    label: "❌" (no match), "so close!" (one edit from a live word, `nearMiss()` in words.js), "that's you!"
    (own word), "too late!" (`lastWord` of someone typing a new one, or a knocked-out player's word), or
