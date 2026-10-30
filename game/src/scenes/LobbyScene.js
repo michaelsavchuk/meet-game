@@ -5,6 +5,7 @@ import { Character, separate } from '../objects/Character.js';
 import { CHAT_BUBBLE_MS } from '../config.js';
 
 const MIN_PLAYERS = 2;
+const ENTER_STAGGER = 800;   // ms; on returning to the lobby, everyone starts running in within this
 
 // Phase 1: anyone who chats joins and gets a random emoji; reacting changes it. The host starts the game from
 // the control page (or presses Enter).
@@ -21,7 +22,7 @@ export class LobbyScene extends Phaser.Scene {
     this.characters = new Map();   // name -> Character
     this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
 
-    for (const player of roster.all()) this.addCharacter(player);
+    for (const player of roster.all()) this.addCharacter(player, { delay: Phaser.Math.Between(0, ENTER_STAGGER) });
 
     listen(this, { chat: this.onChat, reaction: this.onReaction });
 
@@ -55,7 +56,7 @@ export class LobbyScene extends Phaser.Scene {
   // ---- Bridge events ----
 
   onChat({ player: { name }, text }) {
-    const character = this.characters.get(name) ?? this.addCharacter(roster.join(name), { pop: true });
+    const character = this.characters.get(name) ?? this.addCharacter(roster.join(name));
     this.say(character, text);
   }
 
@@ -69,13 +70,10 @@ export class LobbyScene extends Phaser.Scene {
 
   // ---- Helpers ----
 
-  addCharacter(player, { pop = false } = {}) {
-    const character = new Character(this, player);
+  // Everyone runs in from a random staircase.
+  addCharacter(player, { delay = 0 } = {}) {
+    const character = new Character(this, player).enter({ delay });
     this.characters.set(player.name, character);
-    if (pop) {
-      character.setScale(0);
-      this.tweens.add({ targets: character, scale: 1, duration: 350, ease: 'Back.easeOut' });
-    }
     return character;
   }
 

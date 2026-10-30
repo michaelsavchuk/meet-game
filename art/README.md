@@ -9,7 +9,7 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
 `execute_blender_code` for bulk changes (150 tiles, 31 materials).
 
 ## Scene layout
-- **`Arena` collection**: everything the camera sees. 226 **linked duplicates** (they share mesh data with the pack
+- **`Arena` collection**: everything the camera sees. 232 **linked duplicates** (they share mesh data with the pack
   originals, so editing an original's mesh or material updates every copy):
   - Floor: 13×8 grid of 1 m tiles centered on the origin (x −6..6, y −3.5..3.5). About 15% are `floor-detail`,
     chosen with `random.Random(7)` so a rebuild comes out the same.
@@ -20,6 +20,13 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
     back-right 0, back-left π/2, front-left π, front-right −π/2.
     To revert to the original full `wall` corners, run this for each corner object: `o.data = bpy.data.meshes[o['orig_mesh']]`,
     then `o.rotation_euler.z = o['orig_rot_z']`. The objects are `wall.001`–`wall.004`.
+  - Stairs: copies of the pack's `stairs` replace the wall pieces at the middle of each side, so players can enter from
+    any side: `stairs-back` (0, 4.5) and `stairs-front` (0, −4.5), and two wide on the sides (which have an even number
+    of tiles) at y = ±0.5: `stairs-left`, `stairs-left.001`, `stairs-right`, `stairs-right.001`. The top step (0.9 m, level
+    with the `dirt` outside) faces out, using the same `rotation_euler.z` as the wall it replaced. Each has a second flight,
+    `<name>-upper`, stacked on it 0.9 m further out and 0.9 m up (keeping the 0.15 m step rhythm), so the steps keep
+    climbing past the frame edge and players seem to come in from off screen rather than down from the dirt. Don't let the
+    flights overlap: their side faces would be coplanar and z-fight.
   - Dirt: 76 `dirt` blocks (random 90° turns, `random.Random(11)`) filling the ground outside the walls. They're placed only
     where a tile is in view, so no world background shows in the render. Re-run that placement if the camera moves.
   - All pack objects carry `rotation_euler.x = 90°` and `scale = 0.01` from the FBX import. Keep that when
@@ -65,3 +72,7 @@ at y 108. Its front edge is x 69–1211 at y 675, where the front wall's top sta
 each character's feet inside it (`limits()`). If the camera, lens, or room size changes, re-render and re-measure
 the floor corners. Project (±6.5, ±4, 0) and the front wall's inner top (0, −4, 1) with
 `bpy_extras.object_utils.world_to_camera_view`, then update `ARENA`.
+
+`STAIRS` in the same file is where characters run in: for each staircase, the bottom step's two ends at the floor
+(z 0, on the wall's inner line) and the same line 2 m further out at z 1.8 (off screen), in px. Re-measure it the same
+way if the stairs or camera move.

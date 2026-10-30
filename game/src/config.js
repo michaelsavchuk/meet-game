@@ -23,6 +23,15 @@ export function arenaEdges(y) {
     right: ARENA.back.right + (ARENA.front.right - ARENA.back.right) * t,
   };
 }
+// The staircases in assets/arena.png that characters run in by, in screen px at feet level. `foot` is the bottom step's
+// two ends where it meets the floor; `off` is the same line of the stairs carried on off screen. Measured like ARENA
+// (project the stairs' bottom edge and a point 2 m further out and up); re-measure if the stairs or camera move.
+export const STAIRS = [
+  { foot: [[610, 108], [670, 108]], off: [[617, -102], [663, -102]] },     // back
+  { foot: [[605, 699], [675, 699]], off: [[610, 849], [670, 849]] },       // front
+  { foot: [[102, 447], [121, 315]], off: [[-129, 376], [-102, 251]] },     // left
+  { foot: [[1178, 447], [1159, 315]], off: [[1409, 376], [1382, 251]] },   // right
+];
 // Characters closer than this get nudged apart so names and bubbles stay readable. Wider than tall
 // because word bubbles are.
 export const PERSONAL_SPACE = { x: 140, y: 110 };
@@ -31,6 +40,7 @@ export const MAX_HP = 3;
 export const DAMAGE = 1;
 
 export const WANDER_SPEED = 70;     // px/s while bouncing around
+export const ENTER_SPEED = 280;     // px/s while running in from the stairs (in the lobby; battle times it to the countdown)
 export const CHASE_SPEED = 380;     // px/s while running at a target
 export const FLEE_SPEED = 160;      // px/s while "typing" and steering away from others (chasers still catch up)
 export const CHASED_FLEE_SPEED = 120; // px/s while being chased (and not typing)
@@ -39,6 +49,10 @@ export const ATTACK_RANGE = 55;     // how close an attacker gets before swingin
 export const CHASE_TIMEOUT = 5000;  // ms; land the hit anyway if a chase drags on
 export const WORD_DELAY = 2500;     // ms after a hit before the victim's new word appears (they "type" until then)
 export const CLASH_KNOCKBACK = 550; // px/s both fighters bounce apart when a counter parries a hit
+// A round starts with fighters running in from the stairs while the banner counts COUNTDOWN, …, 1, one number every
+// COUNTDOWN_STEP ms, then "Type to Fight!"; words appear (and attacks count) only then.
+export const COUNTDOWN = 3;
+export const COUNTDOWN_STEP = 1000;
 
 // Sudden death: after SUDDEN_DEATH_AFTER ms without a hit, chases get SUDDEN_DEATH_BOOST × CHASE_SPEED
 // faster every SUDDEN_DEATH_STEP ms (up to SUDDEN_DEATH_MAX ×), so counters eventually can't keep up.

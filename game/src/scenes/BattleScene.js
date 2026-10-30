@@ -2,23 +2,25 @@ import * as Phaser from 'phaser';
 import { listen, simulateChat, simulateReaction, FAKE_EMOJI } from '../bridge.js';
 import { roster } from '../roster.js';
 import { pickWord, tokenize, nearMiss } from '../words.js';
-import { Character, separate } from '../objects/Character.js';
+import { Character, separate, spreadSpots } from '../objects/Character.js';
 import { SpeedLines } from '../objects/SpeedLines.js';
 import {
   WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED, CHASE_SPEED, CLASH_KNOCKBACK,
-  DISPLAY_FONT, SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX,
+  DISPLAY_FONT, SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX, COUNTDOWN, COUNTDOWN_STEP,
 } from '../config.js';
 
 const LOG_LINES = 30;   // shown on the control page
 const KO_FRAMES = { frameWidth: 128, frameHeight: 256 };   // assets/ko.png: a strip of 6 flame-burst frames
 const MISS_COLORS = { 'so close!': '#ffd84d', '❌': '#ffffff' };
-// Banners ("Type to Fight!", "Sudden death!", the winner): big text on a slanted dark blue bar across the screen. The bar
+// Banners (the 3-2-1 countdown, "Type to Fight!", "Sudden death!", the winner): big text on a slanted dark blue bar across the screen. The bar
 // cuts in and out with no fades, with a small screen shake as it appears; its letters fly up into it one after another,
-// clipped to the bar. The winner's letters then keep bobbing in a wave.
+// clipped to the bar. The winner's letters then keep bobbing in a wave. "Sudden death!" is a quick still flash instead,
+// so it doesn't cover the fight for long.
 const BANNER_SIZE = 88;          // px font size; long text is scaled down to fit
 const BANNER_ANGLE = -4;         // degrees
 const BANNER_PADDING = 24;       // px of bar above and below the text
 const BANNER_MS = 1600;          // how long a flash banner stays up
+const FLASH_MS = 600;            // how long a still banner (`animate: false`) stays up
 const BANNER_STAGGER = 50;       // ms between letters starting to fly in
 const BANNER_FLY_MS = 320;       // ms for each letter to fly in
 const BANNER_WAVE = { amplitude: 10, hz: 1.2 };   // the winner's letters: px up and down, cycles per second
@@ -26,8 +28,11 @@ const BANNER_SHAKE = { duration: 180, intensity: 0.008 };
 const BANNER_COLOR = 0x0b0e2a;   // very dark blue, like the arena's AO
 const CONFETTI_BURST = 40;        // pieces when the winner is announced
 const CONFETTI_EVERY = 60;        // ms between pieces after that, until back in the lobby
+const ENTER_STAGGER = 600;        // ms; fighters start running in within this, and all arrive as the countdown ends
+const ENTER_SLACK = 150;          // ms before "Type to Fight!" by which everyone has arrived
 
-// Phase 2: everyone gets a word. Typing another player's word sends your character to attack them.
+// Phase 2: everyone runs in during a countdown, then gets a word. Typing another player's word sends your character
+// to attack them.
 // Last one standing wins (phase 3: the winner banner, then back to the lobby).
 export class BattleScene extends Phaser.Scene {
   constructor() {
@@ -43,6 +48,7 @@ export class BattleScene extends Phaser.Scene {
     // The burst where a knocked-out character leaves the screen (Character.blast): a few rapid loops, then gone.
     if (!this.anims.exists('ko')) this.anims.create({ key: 'ko', frames: this.anims.generateFrameNumbers('ko'), frameRate: 30, repeat: 2 });
     this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
+    this.fighting = false;   // false during the countdown: no words, no attacks
     this.over = false;
     this.winner = null;
     this.log = [];
@@ -55,15 +61,18 @@ export class BattleScene extends Phaser.Scene {
     this.speedLines = new SpeedLines(this);
 
     // Everyone in the roster when the round starts plays; anyone who joins later waits for the next round.
-    const taken = new Set();
-    for (const player of roster.all()) {
-      const word = pickWord(taken);
-      taken.add(word);
-      const character = new Character(this, player).setSword(true).setHp(MAX_HP, MAX_HP).setBubble(word, { highlight: true });
-      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, lastWord: null, out: false, revealTimer: null, parries: new Set() });
+    // They scramble in from the stairs to spread-out spots while the banner counts down, arriving just before it ends.
+    const countdown = COUNTDOWN * COUNTDOWN_STEP;
+    const spots = spreadSpots(roster.size);
+    for (const [i, player] of roster.all().entries()) {
+      const delay = Phaser.Math.Between(0, ENTER_STAGGER);
+      const character = new Character(this, player).setSword(true).setHp(MAX_HP, MAX_HP)
+        .enter({ spot: spots[i], delay, duration: countdown - ENTER_SLACK - delay });
+      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word: null, lastWord: null, out: false, revealTimer: null, parries: new Set() });
     }
 
-    this.banner('Type to Fight!');
+    for (let n = COUNTDOWN; n > 0; n--) this.time.delayedCall((COUNTDOWN - n) * COUNTDOWN_STEP, () => this.banner(String(n)));
+    this.time.delayedCall(countdown, () => this.fight());
 
     listen(this, { chat: this.onChat, reaction: this.onReaction });
 
@@ -100,10 +109,22 @@ export class BattleScene extends Phaser.Scene {
     for (const key of ['C', 'X', 'T', 'P', 'R']) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
   }
 
+  // The countdown's over: "Type to Fight!", and once it's gone (so it doesn't hide anyone's word) everyone gets a word
+  // at once, and attacks (and the sudden death clock) start.
+  fight() {
+    this.banner('Type to Fight!');
+    this.time.delayedCall(BANNER_MS, () => {
+      this.fighting = true;
+      this.lastHitAt = this.time.now;
+      for (const fighter of this.fighters.values()) this.newWord(fighter);
+    });
+  }
+
   // What the control page shows (see remote.js).
   snapshot() {
     return {
       phase: 'battle',
+      fighting: this.fighting,
       over: this.over,
       winner: this.winner?.name ?? null,
       boost: this.suddenDeath ? 1 + this.suddenDeath * SUDDEN_DEATH_BOOST : 0,
@@ -142,7 +163,7 @@ export class BattleScene extends Phaser.Scene {
       character.chaseSpeed = CHASE_SPEED * (1 + this.suddenDeath * SUDDEN_DEATH_BOOST);
       const chasedBy = chasers.get(character) ?? 0;
       character.setAlert(chasedBy);
-      character.fleeSpeed = this.over ? 0 : Math.max(word === null ? FLEE_SPEED : 0, chasedBy ? CHASED_FLEE_SPEED : 0);
+      character.fleeSpeed = this.over || !this.fighting ? 0 : Math.max(word === null ? FLEE_SPEED : 0, chasedBy ? CHASED_FLEE_SPEED : 0);
       if (character.fleeSpeed) character.steerAway(alive.filter((c) => c !== character), delta);
     }
     for (const character of characters) character.update(time, delta);
@@ -156,7 +177,7 @@ export class BattleScene extends Phaser.Scene {
       if (!roster.has(name)) { roster.join(name); this.addLog(`👋 ${name} joins next round`); }
       return;
     }
-    if (this.over || attacker.out) return;
+    if (this.over || !this.fighting || attacker.out) return;
 
     const words = tokenize(text);
     // Counter: typing the word of someone chasing you readies a parry instead of chasing them back.
@@ -252,9 +273,9 @@ export class BattleScene extends Phaser.Scene {
   updateSuddenDeath(time) {
     const idle = time - this.lastHitAt;
     const max = (SUDDEN_DEATH_MAX - 1) / SUDDEN_DEATH_BOOST;
-    const level = this.over || idle < SUDDEN_DEATH_AFTER ? 0 : Math.min(max, 1 + Math.floor((idle - SUDDEN_DEATH_AFTER) / SUDDEN_DEATH_STEP));
+    const level = this.over || !this.fighting || idle < SUDDEN_DEATH_AFTER ? 0 : Math.min(max, 1 + Math.floor((idle - SUDDEN_DEATH_AFTER) / SUDDEN_DEATH_STEP));
     if (level === this.suddenDeath) return;
-    if (level === 1 && this.suddenDeath === 0) this.banner('⚡ Sudden death!');
+    if (level === 1 && this.suddenDeath === 0) this.banner('⚡ Sudden death!', { animate: false });
     this.suddenDeath = level;
     this.speedLines.setLevel(level / max);
   }
@@ -330,8 +351,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   // Cut to a banner (replacing any still showing), which cuts away after BANNER_MS unless `persist`.
-  // `wave` keeps the letters bobbing once they're in.
-  banner(text, { color = '#ffffff', persist = false, wave = false } = {}) {
+  // `wave` keeps the letters bobbing once they're in. `animate: false` shows the letters in place (still with the
+  // shake) and cuts away after FLASH_MS.
+  banner(text, { color = '#ffffff', persist = false, wave = false, animate = true } = {}) {
     this.bannerTimer?.remove();
     this.bannerObj?.destroy();
 
@@ -350,11 +372,12 @@ export class BattleScene extends Phaser.Scene {
       let x = -lineWidth(line) / 2;
       for (const letter of line) {
         letter.restY = -height / 2 + row * lineHeight;   // the letter's resting y (origin is its top-left), unscaled
-        letter.setPosition(x, letter.restY + barHeight / scale);   // starts below the bar, cropped away by updateBanner()
+        // Starts below the bar, cropped away by updateBanner(), to fly in.
+        letter.setPosition(x, animate ? letter.restY + barHeight / scale : letter.restY);
         x += letter.width;
       }
     });
-    letters.forEach((letter, i) => {
+    if (animate) letters.forEach((letter, i) => {
       this.tweens.add({
         targets: letter, y: letter.restY, delay: i * BANNER_STAGGER, duration: BANNER_FLY_MS, ease: 'Back.easeOut',
         onComplete: () => { letter.landedAt = this.time.now; },
@@ -368,7 +391,7 @@ export class BattleScene extends Phaser.Scene {
     this.bannerState = { letters, clip: barHeight / 2 / scale, wave };
     this.updateBanner();
     this.cameras.main.shake(BANNER_SHAKE.duration, BANNER_SHAKE.intensity);
-    this.bannerTimer = persist ? null : this.time.delayedCall(BANNER_MS, () => {
+    this.bannerTimer = persist ? null : this.time.delayedCall(animate ? BANNER_MS : FLASH_MS, () => {
       this.bannerObj.destroy();
       this.bannerObj = this.bannerState = null;
     });

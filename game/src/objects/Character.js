@@ -1,5 +1,5 @@
 import * as Phaser from 'phaser';
-import { WIDTH, HEIGHT, ARENA, arenaEdges, WANDER_SPEED, CHASE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
+import { WIDTH, HEIGHT, ARENA, STAIRS, arenaEdges, WANDER_SPEED, ENTER_SPEED, CHASE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
 
 const WALL_MARGIN = 120;   // while fleeing, walls closer than this push back so nobody gets cornered
 const FEET = 24;           // the emoji's bottom, below the character's position; feet stay on the ARENA floor
@@ -62,16 +62,38 @@ function limits(y) {
 }
 
 // A random spot on the floor.
-function randomSpot() {
+export function randomSpot() {
   const { top, bottom } = limits(0);
   const y = Phaser.Math.Between(top, bottom);
   const { left, right } = limits(y);
   return { x: Phaser.Math.Between(left, right), y };
 }
 
-// Nudge wandering characters apart so they don't stack. Chasers, airborne and knocked-out characters are left alone.
+// `count` random spots on the floor, spread out: each is the best of several tries at being far from the others
+// (in PERSONAL_SPACE units, so it spreads wider than tall like the space characters keep).
+export function spreadSpots(count) {
+  const spots = [];
+  const gap = (s) => Math.min(...spots.map((o) => Math.hypot((s.x - o.x) / PERSONAL_SPACE.x, (s.y - o.y) / PERSONAL_SPACE.y)));
+  for (let i = 0; i < count; i++) {
+    const tries = Array.from({ length: spots.length ? 12 : 1 }, randomSpot);
+    spots.push(tries.reduce((best, s) => (gap(s) > gap(best) ? s : best)));
+  }
+  return spots;
+}
+
+// A way in from a random staircase (STAIRS): from off screen, down the stairs to their foot, then across to `spot`.
+// The points are character positions, not feet.
+function entryPath(spot) {
+  const { foot, off } = Phaser.Utils.Array.GetRandom(STAIRS);
+  const t = Phaser.Math.FloatBetween(0.2, 0.8);   // where across the stairs' width
+  const at = ([[ax, ay], [bx, by]]) => ({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t - FEET });
+  return [at(off), at(foot), spot];
+}
+
+// Nudge wandering characters apart so they don't stack. Chasers, airborne, entering and knocked-out characters are
+// left alone.
 export function separate(characters, delta) {
-  const free = characters.filter((c) => !c.out && !c.chasing && !c.airborne);
+  const free = characters.filter((c) => !c.out && !c.chasing && !c.airborne && !c.entering);
   const push = Math.min(1, (delta / 1000) * 4);
   for (let i = 0; i < free.length; i++) {
     for (let j = i + 1; j < free.length; j++) {
@@ -90,8 +112,8 @@ export function separate(characters, delta) {
 }
 
 // A player on screen: a bouncing emoji with a sword, name tag, optional hearts, and a speech bubble.
-// Scenes call update() every frame. Movement is either wandering (bouncing off the arena walls)
-// or chasing a target set with chase().
+// Scenes call update() every frame. Movement is either wandering (bouncing off the arena walls),
+// running in from the stairs (enter()), or chasing a target set with chase().
 export class Character extends Phaser.GameObjects.Container {
   constructor(scene, player, { x, y } = {}) {
     const spot = randomSpot();
@@ -105,7 +127,8 @@ export class Character extends Phaser.GameObjects.Container {
     this.air = 0;                              // seconds left in a knockback flip (see knockback)
     this.out = false;
     this.target = null;
-    this.fleeSpeed = 0;     // set by the scene; when > 0, moves at this speed and steers away (see steerAway)
+    this.path = null;       // points left to run through while entering (see enter)
+    this.fleeSpeed = 0;    // set by the scene; when > 0, moves at this speed and steers away (see steerAway)
     this.chaseSpeed = CHASE_SPEED;   // the scene raises it during sudden death
 
     const angle = Math.random() * Math.PI * 2;
@@ -224,6 +247,7 @@ export class Character extends Phaser.GameObjects.Container {
     const dt = delta / 1000;
 
     if (this.airborne) this.stepAir(dt);
+    else if (this.path) this.stepPath(dt);
     else if (this.target) this.stepChase(time, dt);
     else if (!this.out) this.stepWander(dt);
 
@@ -395,6 +419,46 @@ export class Character extends Phaser.GameObjects.Container {
     this.swingTween?.remove();
     this.sword.setX(right ? HAND_X : -HAND_X).setScale(right ? -1 : 1, 1).setAngle(right ? -SWORD_ANGLE : SWORD_ANGLE);
     this.shield.setX(right ? -HAND_X : HAND_X);
+  }
+
+  // Run in from a random staircase to `spot` (default: anywhere on the floor), starting off screen after `delay` ms.
+  // `duration` (ms, counted from the start of the run) sets the pace instead of ENTER_SPEED. Floor limits don't apply
+  // until the spot is reached; then it wanders as usual.
+  enter({ spot = randomSpot(), delay = 0, duration } = {}) {
+    this.path = entryPath(spot);
+    this.setPosition(this.path[0].x, this.path[0].y);
+    this.lastPos = { x: this.x, y: this.y };
+    let length = 0;
+    this.path.reduce((a, b) => { length += Math.hypot(b.x - a.x, b.y - a.y); return b; });
+    this.pathSpeed = duration ? length / (duration / 1000) : ENTER_SPEED;
+    this.pathDelay = delay / 1000;
+    this.path.shift();
+    return this;
+  }
+
+  get entering() { return this.path != null; }
+
+  stepPath(dt) {
+    if (this.pathDelay > 0) { this.pathDelay -= dt; return; }
+    let step = this.pathSpeed * dt;
+    while (this.path.length && step > 0) {
+      const { x, y } = this.path[0];
+      const dx = x - this.x;
+      const dy = y - this.y;
+      const dist = Math.hypot(dx, dy);
+      this.face(dx);
+      if (dist > step) {
+        this.x += (dx / dist) * step;
+        this.y += (dy / dist) * step;
+        this.vx = (dx / dist) * WANDER_SPEED;   // carry on this way once in
+        this.vy = (dy / dist) * WANDER_SPEED;
+        return;
+      }
+      this.setPosition(x, y);
+      step -= dist;
+      this.path.shift();
+    }
+    this.path = null;
   }
 
   get chasing() { return this.target != null; }

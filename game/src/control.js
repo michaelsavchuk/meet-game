@@ -57,9 +57,9 @@ function renderLobby({ players, canStart }) {
   $('waiting').textContent = '';
 }
 
-function renderBattle({ over, winner, boost, maxHp, fighters, waiting, log }) {
+function renderBattle({ fighting, over, winner, boost, maxHp, fighters, waiting, log }) {
   const alive = fighters.filter((f) => !f.out).length;
-  const summary = over ? `👑 ${winner} is the one!` : `Battle · ${alive} of ${fighters.length} still standing`;
+  const summary = over ? `👑 ${winner} is the one!` : fighting ? `Battle · ${alive} of ${fighters.length} still standing` : 'Battle · get ready…';
   $('summary').replaceChildren(summary);
   if (boost && !over) $('summary').append(' · ', span(`⚡ sudden death, chases ×${boost}`, 'gold'));
 
@@ -69,7 +69,7 @@ function renderBattle({ over, winner, boost, maxHp, fighters, waiting, log }) {
       cell(f.emoji, 'emoji'),
       cell(f.name, 'name'),
       cell('❤️'.repeat(f.hp) + '🖤'.repeat(Math.max(0, maxHp - f.hp))),
-      cell(f.out ? '' : over ? '🏆 winner' : f.word ?? '… typing', 'word'),
+      cell(f.out ? '' : over ? '🏆 winner' : !fighting ? '' : f.word ?? '… typing', 'word'),
       cell(fighterState(f), 'state'),
     ]);
     tr.classList.toggle('out', f.out);

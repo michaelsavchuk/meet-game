@@ -25,9 +25,12 @@ extension/ --POST /messages, /reactions--> server/ --SSE /events--> game/ (Phase
 
 ## The game
 Phases, one scene each (`game/src/scenes/`):
-1. **LobbyScene**: chatting anything joins (random character emoji); any reaction changes your emoji.
+1. **LobbyScene**: chatting anything joins (random character emoji) and your character runs in from a random
+   staircase; any reaction changes your emoji. Returning to the lobby, everyone runs in again.
    Host clicks Start on the control page (2+ players) or presses Enter on the game. "Clear players" empties the roster.
-2. **BattleScene**: everyone in the roster gets a unique word (`words.js`) in a speech bubble. Typing
+2. **BattleScene**: everyone in the roster runs in from a random staircase to spread-out spots (`spreadSpots()`)
+   while the banner counts down 3-2-1 (`COUNTDOWN`), timed to arrive just before it ends. Then "Type to Fight!", and once that banner is gone (so it hides
+   nobody's word) everyone gets a unique word (`words.js`) in a speech bubble; until then (`fighting` false) chat does nothing. Typing
    another player's word (whole word, case-insensitive) makes your character chase and hit them.
    Rules: 3 HP, 1 per hit. The victim keeps their word while attackers run at them, so several
    players can chase the same person. When a hit lands, the victim's word is cleared (`word = null`)
@@ -42,7 +45,7 @@ Phases, one scene each (`game/src/scenes/`):
    `clash()` knocks both back with no damage and gives both new words immediately (no "…" delay, so
    nobody can pre-type a counter); other chasers still hit.
    Sudden death (`updateSuddenDeath()`): after `SUDDEN_DEATH_AFTER` ms without a hit (parries don't count),
-   a banner shows and every chase gets faster each `SUDDEN_DEATH_STEP` ms, up to ×`SUDDEN_DEATH_MAX`, until
+   a banner flashes briefly (shake, but no letter fly-in) and every chase gets faster each `SUDDEN_DEATH_STEP` ms, up to ×`SUDDEN_DEATH_MAX`, until
    counters can't keep up, with yellow anime action lines flickering in the corners (`objects/SpeedLines.js`,
    more and longer as it speeds up). The next hit resets it.
    Miss feedback (`missReason()`): a fighter's message that attacks nobody shakes their head and floats a
@@ -61,7 +64,7 @@ blue AO). Read `art/README.md` before editing it: layout, camera, and the shared
 `roster.js` (players across rounds, name → emoji), `objects/Character.js` (emoji whose hop rate follows
 its speed, sword, bubble, hearts, chase/hit, `separate()` to keep characters from stacking; a knockback flips
 the figure through the air, and a knockout flings it off screen into the `game/assets/ko.png` burst that
-BattleScene preloads), `config.js` (HP, speeds, sudden death timing, arena bounds and
+BattleScene preloads; `enter()` runs it in from off screen down a staircase in `STAIRS`), `config.js` (HP, speeds, sudden death timing, arena bounds and
 other tuning; animation tuning lives at the top of Character.js).
 
 ## Conventions
