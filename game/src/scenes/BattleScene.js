@@ -1,13 +1,15 @@
 import * as Phaser from 'phaser';
 import { listen, simulateChat, simulateReaction, FAKE_EMOJI } from '../bridge.js';
 import { roster } from '../roster.js';
-import { pickWord, tokenize, nearMiss } from '../words.js';
-import { Character, separate, spreadSpots } from '../objects/Character.js';
+import { pickWord, tokenize, nearMiss, HEART_WORDS } from '../words.js';
+import { Character, separate, spreadSpots, randomSpot, clampToFloor } from '../objects/Character.js';
+import { Heart } from '../objects/Heart.js';
 import { SpeedLines } from '../objects/SpeedLines.js';
 import { FloorText } from '../objects/FloorText.js';
 import {
   WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED, CHASE_SPEED, CLASH_KNOCKBACK,
   DISPLAY_FONT, SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX, COUNTDOWN, COUNTDOWN_STEP,
+  HEART_EVERY, HEART_LIFETIME, HEART_HEAL, HEART_NEAR, HEART_ANYWHERE,
 } from '../config.js';
 
 const LOG_LINES = 30;   // shown on the control page
@@ -59,6 +61,9 @@ export class BattleScene extends Phaser.Scene {
     this.fighters = new Map();
     this.lastHitAt = this.time.now;   // for sudden death
     this.suddenDeath = 0;             // 0 = off, then 1, 2, ... as chases speed up
+    this.heart = null;       // the heart pickup on screen, if any (see dropHeart)
+    this.lastHeartWord = null;   // the last one's word; typing it now says "too late!"
+    this.heartTimer = null;
     this.speedLines = new SpeedLines(this);
     this.floorText = new FloorText(this);
 
@@ -82,7 +87,7 @@ export class BattleScene extends Phaser.Scene {
 
     // Commands from the control page (see remote.js). Dev: C = a random fighter attacks someone, X = a random
     // fighter chats a non-word, T = a typo of someone's word, P = a chased fighter counters their chaser,
-    // R = a random fighter reacts.
+    // R = a random fighter reacts, H = a heart drops now, G = a random fighter goes for the heart.
     this.commands = {
       end: () => this.backToLobby(),
       C: () => {
@@ -108,9 +113,14 @@ export class BattleScene extends Phaser.Scene {
       R: () => {
         if (this.fighters.size) simulateReaction(Phaser.Utils.Array.GetRandom([...this.fighters.keys()]), Phaser.Utils.Array.GetRandom(FAKE_EMOJI));
       },
+      H: () => this.fighting && !this.over && this.dropHeart(true),
+      G: () => {
+        const grabber = Phaser.Utils.Array.GetRandom(this.alive().filter((f) => !f.character.chasing));
+        if (grabber && this.liveHeart()) simulateChat(grabber.name, this.heart.word);
+      },
     };
     this.input.keyboard.on('keydown-ENTER', () => this.over && this.backToLobby());
-    for (const key of ['C', 'X', 'T', 'P', 'R']) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
+    for (const key of ['C', 'X', 'T', 'P', 'R', 'H', 'G']) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
   }
 
   // The countdown's over: "Type to Fight!", and once it's gone (so it doesn't hide anyone's word) everyone gets a word
@@ -121,6 +131,7 @@ export class BattleScene extends Phaser.Scene {
       this.fighting = true;
       this.lastHitAt = this.time.now;
       for (const fighter of this.fighters.values()) this.newWord(fighter);
+      this.scheduleHeart();
     });
   }
 
@@ -132,6 +143,7 @@ export class BattleScene extends Phaser.Scene {
       over: this.over,
       winner: this.winner?.name ?? null,
       boost: this.suddenDeath ? 1 + this.suddenDeath * SUDDEN_DEATH_BOOST : 0,
+      heart: this.liveHeart()?.word ?? null,
       maxHp: MAX_HP,
       fighters: [...this.fighters.values()].map((f) => ({
         name: f.name,
@@ -139,7 +151,7 @@ export class BattleScene extends Phaser.Scene {
         hp: f.hp,
         word: f.word,
         out: f.out,
-        chasing: this.fighterOf(f.character.target)?.name ?? null,
+        chasing: this.fighterOf(f.character.target)?.name ?? (f.character.target && f.character.target === this.heart ? 'the 💖' : null),
         parrying: [...f.parries].map((p) => p.name),
       })),
       waiting: roster.all().filter((p) => !this.fighters.has(p.name)),   // joined mid-round
@@ -171,6 +183,7 @@ export class BattleScene extends Phaser.Scene {
       if (character.fleeSpeed) character.steerAway(alive.filter((c) => c !== character), delta);
     }
     for (const character of characters) character.update(time, delta);
+    this.heart?.update(time, delta);
   }
 
   // ---- Bridge events ----
@@ -190,10 +203,12 @@ export class BattleScene extends Phaser.Scene {
       if (!attacker.parries.has(chaser)) { attacker.parries.add(chaser); this.addLog(`🛡️ ${attacker.name} braces for ${chaser.name}`); }
       return;
     }
+    const heart = this.liveHeart();
+    if (heart && words.has(heart.word) && !attacker.character.chasing) { this.grab(attacker, heart); return; }
     const victim = this.alive().find((f) => f !== attacker && words.has(f.word));
     if (victim && !attacker.character.chasing) { this.attack(attacker, victim); return; }   // one attack at a time
 
-    const reason = this.missReason(attacker, words, victim);
+    const reason = this.missReason(attacker, words, victim || words.has(heart?.word));
     if (!reason) return;
     attacker.character.shakeHead();
     // Replace this fighter's previous label so quick messages don't pile up.
@@ -201,15 +216,17 @@ export class BattleScene extends Phaser.Scene {
     attacker.missText = this.floatText(attacker.character.x, attacker.character.y - 125, reason, MISS_COLORS[reason] ?? '#aab0c8');
   }
 
-  // What to show over a fighter whose message didn't attack anyone, or null to show nothing.
-  missReason(attacker, words, victim) {
-    if (attacker.character.chasing) return victim ? 'busy!' : null;   // plain chatter mid-chase is fine
+  // What to show over a fighter whose message didn't attack anyone (or grab the heart), or null to show nothing.
+  // `live` is whether it had a live word in it (another fighter's, or the heart's).
+  missReason(attacker, words, live) {
+    if (attacker.character.chasing) return live ? 'busy!' : null;   // plain chatter mid-chase is fine
     if (words.has(attacker.word)) return "that's you!";
     // An old word: someone who was just hit (now "typing"), or a knocked-out player.
     const others = [...this.fighters.values()].filter((f) => f !== attacker);
-    if (others.some((f) => words.has(f.lastWord) || (f.out && words.has(f.word)))) return 'too late!';
-    const live = others.filter((f) => !f.out && f.word).map((f) => f.word);
-    if ([...words].some((t) => live.some((w) => nearMiss(t, w)))) return 'so close!';
+    if (others.some((f) => words.has(f.lastWord) || (f.out && words.has(f.word))) || words.has(this.lastHeartWord)) return 'too late!';
+    const liveWords = others.filter((f) => !f.out && f.word).map((f) => f.word);
+    if (this.liveHeart()) liveWords.push(this.heart.word);
+    if ([...words].some((t) => liveWords.some((w) => nearMiss(t, w)))) return 'so close!';
     return '❌';
   }
 
@@ -272,6 +289,77 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  // ---- Heart pickups ----
+
+  // The heart, if one has landed and nobody has grabbed it yet.
+  liveHeart() {
+    return this.heart?.landed && !this.heart.gone ? this.heart : null;
+  }
+
+  scheduleHeart() {
+    this.heartTimer?.remove();
+    this.heartTimer = this.time.delayedCall(Phaser.Math.Between(HEART_EVERY.min, HEART_EVERY.max), () => this.dropHeart());
+  }
+
+  // Drop a heart near someone who needs it, unless there's one already, nobody's hurt, or it's sudden death (then
+  // try again later). `force` (dev key H) skips the last two.
+  dropHeart(force = false) {
+    if (this.over || this.heart) return;
+    const hurt = this.alive().filter((f) => f.hp < MAX_HP);
+    if (!force && (!hurt.length || this.suddenDeath)) { this.scheduleHeart(); return; }
+    this.heartTimer?.remove();
+    const { x, y } = this.heartSpot(hurt);
+    const word = pickWord(new Set([this.lastHeartWord]), HEART_WORDS);
+    const heart = this.heart = new Heart(this, x, y, word, {
+      lifetime: HEART_LIFETIME,
+      onLanded: () => this.addLog(`💖 a heart drops: ${word}`),
+      onExpire: () => this.clearHeart(heart),
+    });
+  }
+
+  // Where a heart lands: usually near a hurt fighter, picked more often the more HP they're missing (squared, so the
+  // one closest to going out is the strong favorite), so they tend to win the race to it; sometimes anywhere.
+  heartSpot(hurt) {
+    if (!hurt.length || Math.random() < HEART_ANYWHERE) return randomSpot();
+    const weights = hurt.map((f) => (MAX_HP - f.hp) ** 2);
+    let roll = Math.random() * weights.reduce((a, b) => a + b);
+    const needy = hurt.find((_, i) => (roll -= weights[i]) < 0) ?? hurt.at(-1);
+    const angle = Math.random() * Math.PI * 2;
+    const dist = Phaser.Math.Between(HEART_NEAR.min, HEART_NEAR.max);
+    return clampToFloor(needy.character.x + Math.cos(angle) * dist, needy.character.y + Math.sin(angle) * dist);
+  }
+
+  // Run for the heart. Others can race for it too; the first to reach it gets it.
+  grab(fighter, heart) {
+    this.addLog(`${fighter.name} 🏃 💖`);
+    fighter.character.chase(heart, () => this.collect(fighter, heart));
+  }
+
+  collect(fighter, heart) {
+    if (this.over || fighter.out || heart.gone) return;
+    const healed = Math.min(MAX_HP, fighter.hp + HEART_HEAL) - fighter.hp;
+    fighter.hp += healed;
+    fighter.character.setHp(fighter.hp, MAX_HP).swing();
+    heart.collect(fighter.character);
+    this.floatText(fighter.character.x, fighter.character.y - 70, healed ? `+${healed} ❤️` : 'full!', '#ff8fb3');
+    this.addLog(`💖 ${fighter.name} grabbed the heart${healed ? '' : ' (already full)'}`);
+    this.clearHeart(heart);
+  }
+
+  // The heart's gone (grabbed or expired): anyone still running for it stops ("too late!"), and the next one is
+  // scheduled.
+  clearHeart(heart) {
+    if (this.heart !== heart) return;
+    this.heart = null;
+    this.lastHeartWord = heart.word;
+    for (const f of this.alive()) {
+      if (f.character.target !== heart) continue;
+      f.character.cancelChase();
+      this.floatText(f.character.x, f.character.y - 125, 'too late!', '#aab0c8');
+    }
+    if (!this.over) this.scheduleHeart();
+  }
+
   // After SUDDEN_DEATH_AFTER ms without a hit, chases speed up a step every SUDDEN_DEATH_STEP ms.
   // Counters don't reset it, so endless parrying can't stall the game. Hits do (see land()).
   updateSuddenDeath(time) {
@@ -325,6 +413,9 @@ export class BattleScene extends Phaser.Scene {
     this.winner = winner;
     this.addLog(`👑 ${winner.name} is the one`);
     for (const f of this.fighters.values()) f.character.cancelChase();
+    this.heartTimer?.remove();
+    this.heart?.expire();
+    this.heart = null;
   }
 
   celebrate(winner) {

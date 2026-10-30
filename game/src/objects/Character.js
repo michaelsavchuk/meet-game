@@ -69,6 +69,14 @@ export function randomSpot() {
   return { x: Phaser.Math.Between(left, right), y };
 }
 
+// The nearest spot on the floor to (x, y).
+export function clampToFloor(x, y) {
+  const { top, bottom } = limits(0);
+  const cy = Phaser.Math.Clamp(y, top, bottom);
+  const { left, right } = limits(cy);
+  return { x: Phaser.Math.Clamp(x, left, right), y: cy };
+}
+
 // `count` random spots on the floor, spread out: each is the best of several tries at being far from the others
 // (in PERSONAL_SPACE units, so it spreads wider than tall like the space characters keep).
 export function spreadSpots(count) {

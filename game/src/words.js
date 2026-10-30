@@ -16,10 +16,19 @@ export const WORDS = [
   'volcano', 'waffle', 'wagon', 'walrus', 'whale', 'wizard', 'yeti', 'yogurt', 'zebra', 'zipper',
 ];
 
-// A random word that isn't in `taken` (words currently on screen), so every bubble is unique.
-export function pickWord(taken = new Set()) {
-  const free = WORDS.filter((w) => !taken.has(w));
-  return Phaser.Utils.Array.GetRandom(free.length ? free : WORDS);
+// For heart pickups: longer (8–11 letters) and trickier to spell, with doubled letters and odd vowels, so grabbing
+// one takes a moment. None are in WORDS.
+export const HEART_WORDS = [
+  'asparagus', 'avalanche', 'blueberry', 'boomerang', 'broccoli', 'butterfly', 'cappuccino', 'chameleon', 'cinnamon',
+  'flamingo', 'harmonica', 'hurricane', 'jellyfish', 'kangaroo', 'labyrinth', 'lollipop', 'marshmallow', 'mosquito',
+  'parachute', 'peppermint', 'pistachio', 'porcupine', 'raspberry', 'saxophone', 'spaghetti', 'tambourine',
+  'toboggan', 'trampoline', 'xylophone', 'zucchini',
+];
+
+// A random word from `list` that isn't in `taken` (words currently on screen), so every bubble is unique.
+export function pickWord(taken = new Set(), list = WORDS) {
+  const free = list.filter((w) => !taken.has(w));
+  return Phaser.Utils.Array.GetRandom(free.length ? free : list);
 }
 
 // Lowercase words in a chat message, for matching typed words against bubbles.

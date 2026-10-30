@@ -54,6 +54,12 @@ Phases, one scene each (`game/src/scenes/`):
    "busy!" (a live word while already chasing; plain chatter mid-chase shows nothing).
    Chase visuals: targets show a wobbling "‼️" (with "×N" for several chasers; BattleScene recounts
    chasers every frame and calls `setAlert()`), and chasers leave a 💨 trail (`puff()`).
+   Hearts (`objects/Heart.js`, `dropHeart()`): every `HEART_EVERY` ms, if someone is hurt and it isn't sudden death,
+   one 💖 drops from the top of the screen (shadow grows at the landing spot), then floats in a spinning sunburst with a
+   pulsing glow and orbiting ✨, under a pink bubble with a longer, trickier word (`HEART_WORDS`). `heartSpot()` lands
+   it near a hurt fighter (weighted by missing HP squared, so the neediest usually wins the race), or anywhere
+   (`HEART_ANYWHERE`). Typing its word chases it like an attack; the first to arrive gets +`HEART_HEAL` HP (full-HP
+   players can still grab it to deny it), other runners get "too late!". It fades after `HEART_LIFETIME` ms.
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.
 3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" (control page) / Enter keeps the roster.
 
@@ -84,7 +90,8 @@ other tuning; animation tuning lives at the top of Character.js).
 - Control page: http://localhost:8787/control in another tab of the same browser.
 - Dev keys on the game page, also buttons on the control page (fake events go through the server like real ones): lobby **C** = a fake player joins,
   **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat,
-  **T** = a typo of someone's word, **P** = a chased fighter counters their chaser.
+  **T** = a typo of someone's word, **P** = a chased fighter counters their chaser,
+  **H** = drop a heart now, **G** = a random fighter goes for the heart.
   Or `curl -XPOST localhost:8787/messages -d '{"id":"1","userId":"u","sender":"Ada","text":"hi","receivedAt":"t"}'`.
 - `window.game` is the Phaser game, e.g. `game.scene.getScene('battle').fighters` in the console.
 - After changing `extension/`, reload it in chrome://extensions.

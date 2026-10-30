@@ -5,7 +5,7 @@ import { CHANNEL } from './remote.js';
 const STALE_MS = 2000;   // no snapshot for this long = the game page is closed
 const DEV = {
   lobby: [['C', 'Fake player joins'], ['R', 'Fake reaction']],
-  battle: [['C', 'Fake attack'], ['X', 'Fake chatter'], ['T', 'Fake typo'], ['P', 'Fake counter'], ['R', 'Fake reaction']],
+  battle: [['C', 'Fake attack'], ['X', 'Fake chatter'], ['T', 'Fake typo'], ['P', 'Fake counter'], ['R', 'Fake reaction'], ['H', 'Drop a heart'], ['G', 'Fake heart grab']],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -57,11 +57,12 @@ function renderLobby({ players, canStart }) {
   $('waiting').textContent = '';
 }
 
-function renderBattle({ fighting, over, winner, boost, maxHp, fighters, waiting, log }) {
+function renderBattle({ fighting, over, winner, boost, heart, maxHp, fighters, waiting, log }) {
   const alive = fighters.filter((f) => !f.out).length;
   const summary = over ? `👑 ${winner} is the one!` : fighting ? `Battle · ${alive} of ${fighters.length} still standing` : 'Battle · get ready…';
   $('summary').replaceChildren(summary);
   if (boost && !over) $('summary').append(' · ', span(`⚡ sudden death, chases ×${boost}`, 'gold'));
+  if (heart && !over) $('summary').append(' · ', `💖 ${heart}`);
 
   $('players-title').textContent = 'Fighters';
   $('players').replaceChildren(...fighters.map((f) => {
