@@ -35,6 +35,8 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
 2. Open http://localhost:8787 (the game you share) and http://localhost:8787/control in another tab of the same
    browser. The control page shows the players, words, HP and battle log, and has the host buttons (Start, Clear
    players, End round / Back to lobby) so none of that is on the shared screen.
+   **CPU players**: pick a level (Easy, Normal, Hard or Mixed) and click **Add CPU** on the control page. CPUs join
+   by chatting and play by typing words at their own speed, with typos, counters and heart grabs, so you can play with fewer people.
    Dev buttons on the control page (or keys on the game page) send fake events through the server: **C** fake join
    (lobby) or attack (battle), **X** fake non-word chat, **T** fake typo, **P** fake counter, **R** fake reaction.
 3. Go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `extension/` folder.

@@ -21,7 +21,14 @@ extension/ --POST /messages, /reactions--> server/ --SSE /events--> game/ (Phase
   the control page (`/control` → `game/control.html` + `src/control.js`), opened in another tab of the same
   browser. `src/remote.js` links them over a `BroadcastChannel`: the game posts the active scene's `snapshot()`
   every 250 ms, and the control page sends command names that run the active scene's `commands[name]`
-  (`start`, `clear`, `end`, and the dev keys).
+  (`start`, `clear`, `end`, and the dev keys). Commands can carry one `arg`; `connectRemote()` also takes scene-independent
+  commands (`addCpu`, `removeCpus`).
+- CPU players (`src/bots.js`): added from the control page (easy/normal/hard/mixed), they run in the game page outside
+  the scenes, read the active scene's state every 100 ms, and send chat through the server with `simulateChat()` like
+  anyone else. Each has its own typing speed (WPM), reaction time, typo rate (sends a typo, then retypes it), chance to
+  notice a chaser and counter, heart greed, and targeting style (`STYLES`), varied a little per bot from `LEVELS`.
+  They join by saying hi, leave when the roster is cleared, and "Remove CPUs" (lobby only) uses `LobbyScene.removePlayer()`.
+  Phaser pauses in a background tab, so keep the game tab in front for CPUs to play.
 - Play page (`/play` → `game/play.html`, self-contained): a fallback for when the extension can't read Meet. Players
   pick a name and send chat/reactions in the extension's raw payload shape; it shows everyone's chat from `/events`.
   It may be served through a tunnel (ngrok), so it uses relative URLs only and avoids secure-context-only APIs.

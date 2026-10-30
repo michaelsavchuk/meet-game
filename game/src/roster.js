@@ -36,5 +36,7 @@ export const roster = {
     return player;
   },
 
+  remove(name) { players.delete(name); },
+
   clear() { players.clear(); },
 };

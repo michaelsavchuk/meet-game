@@ -92,6 +92,14 @@ export class LobbyScene extends Phaser.Scene {
     character.bubbleTimer = this.time.delayedCall(CHAT_BUBBLE_MS, () => character.setBubble(null));
   }
 
+  // Take one player out (CPU players removed from the control page; see bots.js).
+  removePlayer(name) {
+    roster.remove(name);
+    this.characters.get(name)?.destroy();
+    this.characters.delete(name);
+    this.updateFloorText();
+  }
+
   clearPlayers() {
     roster.clear();
     for (const character of this.characters.values()) character.destroy();

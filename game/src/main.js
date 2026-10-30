@@ -1,6 +1,7 @@
 import * as Phaser from 'phaser';
 import { connectBridge, isConnected } from './bridge.js';
 import { connectRemote } from './remote.js';
+import { startBots, addBot, removeBots, botLevels } from './bots.js';
 import { WIDTH, HEIGHT, FONT_FAMILY, DISPLAY_FONT, TEST_STRING } from './config.js';
 import { LobbyScene } from './scenes/LobbyScene.js';
 import { BattleScene } from './scenes/BattleScene.js';
@@ -26,5 +27,9 @@ const game = new Phaser.Game({
 });
 
 connectBridge(game);
-connectRemote(game, () => ({ connected: isConnected() }));
+connectRemote(game, () => ({ connected: isConnected(), cpus: botLevels() }), {
+  addCpu: (level) => addBot(level),
+  removeCpus: () => removeBots(game),
+});
+startBots(game);
 window.game = game;   // for poking at state from the dev console

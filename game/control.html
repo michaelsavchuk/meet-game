@@ -36,6 +36,8 @@
     td.state { color: var(--muted); text-align: right; font-size: 13px; }
     tr.out td { opacity: 0.4; }
     .muted { color: var(--muted); }
+    select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+    .cpu { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 6px; }
     #log { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
     #missing { display: none; }
     body.missing #missing { display: block; }
@@ -64,6 +66,21 @@
         </div>
         <h2 style="margin-top: 16px;">Dev: fake events <span style="text-transform: none; letter-spacing: 0;">(keys work on the game page too)</span></h2>
         <div class="row" id="dev"></div>
+      </section>
+
+      <section>
+        <h2>CPU players</h2>
+        <div class="row">
+          <select id="cpu-level" aria-label="CPU level">
+            <option value="easy">Easy</option>
+            <option value="normal" selected>Normal</option>
+            <option value="hard">Hard</option>
+            <option value="mixed">Mixed</option>
+          </select>
+          <button id="add-cpu">Add CPU 🤖</button>
+          <button id="remove-cpus" class="secondary">Remove CPUs</button>
+        </div>
+        <p id="cpu-note" class="muted" style="margin: 10px 0 0;"></p>
       </section>
 
       <section>
