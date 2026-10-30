@@ -27,6 +27,10 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
     `<name>-upper`, stacked on it 0.9 m further out and 0.9 m up (keeping the 0.15 m step rhythm), so the steps keep
     climbing past the frame edge and players seem to come in from off screen rather than down from the dirt. Don't let the
     flights overlap: their side faces would be coplanar and z-fight.
+  - Decor: a `banner` on the wall piece to each side of the back and side stairs (`banner-back-a/b`, `banner-left-a/b`,
+    `banner-right-a/b`), placed one cell in from the wall with the wall's `rotation_euler.z`. The front wall gets none
+    because its inner face points away from the camera, so only slivers would show. A few props sit in the floor corners
+    (`decor-*`): two barrels back-left, `rocks` (scaled 0.007) back-right, `stones` front-left, a barrel front-right.
   - Dirt: 76 `dirt` blocks (random 90° turns, `random.Random(11)`) filling the ground outside the walls. They're placed only
     where a tile is in view, so no world background shows in the render. Re-run that placement if the camera moves.
   - All pack objects carry `rotation_euler.x = 90°` and `scale = 0.01` from the FBX import. Keep that when
