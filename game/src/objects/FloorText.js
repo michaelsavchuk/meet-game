@@ -8,7 +8,7 @@ const ALPHA = 0.35;
 const SQUASH = 0.8;         // vertical scale, so it lies flat on the tilted floor
 
 // Faint text painted on the middle of the arena floor, under every character: a title with an optional smaller
-// line below. "Chat to join!" in the lobby, "N players remain" in battle.
+// line below. "Chat to join!" in the lobby, "Only N remain" in battle.
 export class FloorText extends Phaser.GameObjects.Container {
   constructor(scene) {
     super(scene, WIDTH / 2, (ARENA.top + ARENA.bottom) / 2);

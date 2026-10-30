@@ -437,10 +437,10 @@ export class BattleScene extends Phaser.Scene {
     return [...this.fighters.values()].filter((f) => !f.out);
   }
 
-  // "N players remain" on the floor, hidden once only the winner is left.
+  // "Only N remain" on the floor, hidden once only the winner is left.
   updateFloorText() {
     const n = this.alive().length;
-    this.floorText.set(n > 1 ? `${n} players remain` : null);
+    this.floorText.set(n > 1 ? `Only ${n} remain` : null);
   }
 
   fighterOf(character) {
