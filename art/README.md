@@ -33,8 +33,11 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
     `banner-right-a/b`), placed one cell in from the wall with the wall's `rotation_euler.z`. The front wall gets none
     because its inner face points away from the camera, so only slivers would show. A few props sit in the floor corners
     (`decor-*`): two barrels back-left, `rocks` (scaled 0.007) back-right, `stones` front-left, a barrel front-right.
-  - Dirt: 76 `dirt` blocks (random 90° turns, `random.Random(11)`) filling the ground outside the walls. They're placed only
-    where a tile is in view, so no world background shows in the render. Re-run that placement if the camera moves.
+  - Dirt: 98 `dirt` blocks (random 90° turns) filling the ground outside the walls: 76 from `random.Random(11)`, plus 22
+    `dirt-fill` copies added when the camera moved back. They're placed only where a tile is in view, so no world
+    background shows in the render. Re-run that placement if the camera moves: for each 1 m cell outside the walls
+    (integer x, half-integer y), add a `dirt` copy at z 0 if any corner at z 0 or 0.9 projects into the frame and no
+    Arena object is already within 0.6 m.
   - All pack objects carry `rotation_euler.x = 90°` and `scale = 0.01` from the FBX import. Keep that when
     placing new copies.
 - **`Collection`**: the original pack assets (props, characters, weapons, every wall/floor variant), laid out in a
@@ -42,8 +45,8 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
 
 ## Camera and light
 - `Camera`: perspective, 50 mm, tilted 26° from straight down (`rotation_euler = (26°, 0, 0)`), roughly at
-  (0, −9.36, 19.76). Framed so the side walls just reach the frame edges at the front and the back wall's top
-  sits at the top edge. Front-wall face is cropped at the bottom.
+  (0, −10.30, 21.37). Framed so the whole walled room is centered vertically, with about 58 px of dirt above the back
+  wall and 60 px below the front wall. The stairs still run off every edge of the frame.
 - `Light`: sun, **shadows off** (`use_shadow = False`). It only matters if toon bands are turned on.
 - World: `Background` (ambient fill) plus a `Camera BG` node mixed in by `Light Path → Is Camera Ray`, so
   the camera sees a dark backdrop (`#0b0b0f`-ish) in the corners above the back wall.
@@ -73,12 +76,13 @@ tried and liked: crisp toon shading (Toon Amount 1, AO Strength 0, sun shadows o
 lower `shadow_maximum_resolution` or raise `scene.eevee.shadow_pool_size`.
 
 ## Fitting the game
-`ARENA` in `game/src/config.js` is this render's visible floor, a trapezoid in screen px. Its back edge is x 151–1129
-at y 108. Its front edge is x 69–1211 at y 675, where the front wall's top starts hiding the floor. `Character.js` keeps
+`ARENA` in `game/src/config.js` is this render's visible floor, a trapezoid in screen px. Its back edge is x 187–1094
+at y 117. Its front edge is x 117–1163 at y 636, where the front wall's top starts hiding the floor. `Character.js` keeps
 each character's feet inside it (`limits()`). If the camera, lens, or room size changes, re-render and re-measure
 the floor corners. Project (±6.5, ±4, 0) and the front wall's inner top (0, −4, 1) with
 `bpy_extras.object_utils.world_to_camera_view`, then update `ARENA`.
 
 `STAIRS` in the same file is where characters run in: for each staircase, the bottom step's two ends at the floor
 (z 0, on the wall's inner line) and the same line 2 m further out at z 1.8 (off screen), in px. Re-measure it the same
-way if the stairs or camera move.
+way if the stairs or camera move: `foot` is (±0.4, ±4, 0) for the back/front stairs and (±6.5, ±0.9, 0) for the sides;
+`off` is (±0.3, ±6, 1.8) and (±8.6, ±0.8, 1.8).

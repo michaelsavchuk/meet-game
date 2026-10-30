@@ -13,7 +13,7 @@ export const TEST_STRING = '|MÉqgy🏀🤯';
 // The floor of assets/arena.png (rendered from art/arena.blend), in screen px, where characters' feet stay.
 // Perspective makes it a trapezoid: `back` and `front` are its left/right edges at y = top and y = bottom
 // (bottom is where the front wall starts hiding the floor). Re-measure if the Blender camera moves.
-export const ARENA = { top: 108, bottom: 675, back: { left: 151, right: 1129 }, front: { left: 69, right: 1211 } };
+export const ARENA = { top: 117, bottom: 636, back: { left: 187, right: 1094 }, front: { left: 117, right: 1163 } };
 
 // The floor's left/right edges at screen y.
 export function arenaEdges(y) {
@@ -27,10 +27,10 @@ export function arenaEdges(y) {
 // two ends where it meets the floor; `off` is the same line of the stairs carried on off screen. Measured like ARENA
 // (project the stairs' bottom edge and a point 2 m further out and up); re-measure if the stairs or camera move.
 export const STAIRS = [
-  { foot: [[610, 108], [670, 108]], off: [[617, -102], [663, -102]] },     // back
-  { foot: [[605, 699], [675, 699]], off: [[610, 849], [670, 849]] },       // front
-  { foot: [[102, 447], [121, 315]], off: [[-129, 376], [-102, 251]] },     // left
-  { foot: [[1178, 447], [1159, 315]], off: [[1409, 376], [1382, 251]] },   // right
+  { foot: [[612, 117], [668, 117]], off: [[618, -76], [662, -76]] },      // back
+  { foot: [[608, 660], [672, 660]], off: [[613, 790], [667, 790]] },       // front
+  { foot: [[145, 430], [161, 309]], off: [[-63, 363], [-41, 249]] },       // left
+  { foot: [[1135, 430], [1119, 309]], off: [[1343, 363], [1321, 249]] },   // right
 ];
 // Characters closer than this get nudged apart so names and bubbles stay readable. Wider than tall
 // because word bubbles are.
