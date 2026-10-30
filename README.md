@@ -15,7 +15,7 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
 
 ## How to play
 1. **Lobby**: type anything in chat to join and get a random emoji character. React with any emoji to
-   change it. The host clicks **Start game** (or presses Enter) once 2+ people have joined.
+   change it. The host clicks **Start game** on the control page (or presses Enter on the game) once 2+ people have joined.
 2. **Battle**: everyone gets a word in a speech bubble and 3 hearts.
    - **Attack**: type someone else's word in chat and your character runs over and hits them. Several
      people can chase the same player. The target runs away, but slower than the chasers, so they still
@@ -28,14 +28,17 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
      counter in time.
    - **Misses**: a message that doesn't hit shows why over your character: ❌, "so close!" for a typo,
      "that's you!", "too late!" for an old word, or "busy!" mid-chase.
-3. **Winner**: the last player standing wins. **Back to lobby** starts over with the same players.
+3. **Winner**: the last player standing wins. **Back to lobby** (control page, or Enter) starts over with the same players.
 
 ## Run it
 1. `npm install`, then `npm start` (or `npm run dev` to restart on server changes).
-2. Open http://localhost:8787. Dev keys send fake events through the server: **C** fake join (lobby) or
-   attack (battle), **X** fake non-word chat, **T** fake typo, **P** fake counter, **R** fake reaction.
+2. Open http://localhost:8787 (the game you share) and http://localhost:8787/control in another tab of the same
+   browser. The control page shows the players, words, HP and battle log, and has the host buttons (Start, Clear
+   players, End round / Back to lobby) so none of that is on the shared screen.
+   Dev buttons on the control page (or keys on the game page) send fake events through the server: **C** fake join
+   (lobby) or attack (battle), **X** fake non-word chat, **T** fake typo, **P** fake counter, **R** fake reaction.
 3. Go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `extension/` folder.
-4. In the Meet call, open the chat panel and share the game tab. Participants' chats and reactions show up in the game.
+4. In the Meet call, open the chat panel and share the game tab (not the control page). Participants' chats and reactions show up in the game.
 
 ## Game events
 Scenes subscribe on `this.game.events`:

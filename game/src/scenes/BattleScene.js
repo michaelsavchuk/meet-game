@@ -3,13 +3,12 @@ import { listen, simulateChat, simulateReaction, FAKE_EMOJI } from '../bridge.js
 import { roster } from '../roster.js';
 import { pickWord, tokenize, nearMiss } from '../words.js';
 import { Character, separate } from '../objects/Character.js';
-import { Button } from '../objects/Button.js';
 import {
   WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED, CHASE_SPEED, CLASH_KNOCKBACK,
-  SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX,
+  DISPLAY_FONT, SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX,
 } from '../config.js';
 
-const LOG_LINES = 4;
+const LOG_LINES = 30;   // shown on the control page
 const KO_FRAMES = { frameWidth: 128, frameHeight: 256 };   // assets/ko.png: a strip of 6 flame-burst frames
 const MISS_COLORS = { 'so close!': '#ffd84d', '❌': '#ffffff' };
 
@@ -30,6 +29,7 @@ export class BattleScene extends Phaser.Scene {
     if (!this.anims.exists('ko')) this.anims.create({ key: 'ko', frames: this.anims.generateFrameNumbers('ko'), frameRate: 30, repeat: 2 });
     this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
     this.over = false;
+    this.winner = null;
     this.log = [];
     // name -> { name, character, hp, word, lastWord, out, revealTimer, parries }. After a hit, word is null
     // while they "type" a new one (lastWord keeps the old one), and revealTimer brings a new one.
@@ -47,42 +47,63 @@ export class BattleScene extends Phaser.Scene {
       this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word, lastWord: null, out: false, revealTimer: null, parries: new Set() });
     }
 
-    this.add.text(WIDTH / 2, 48, "Type someone's word to attack!", { fontSize: '36px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
-    this.aliveText = this.add.text(WIDTH / 2, 92, '', { fontSize: '22px', color: '#aab0c8' }).setOrigin(0.5);
-    this.logText = this.add.text(20, 20, '', { fontSize: '16px', color: '#c8cce0', lineSpacing: 4 }).setDepth(20000);
-    this.endButton = new Button(this, WIDTH - 90, 76, 'End round', () => this.backToLobby(), { width: 150, height: 40, color: 0x6b6f80 }).setDepth(20000);
-    this.endButton.label.setFontSize(18);
-    this.refreshAlive();
     this.banner('Fight! ⚔️');
 
     listen(this, { chat: this.onChat, reaction: this.onReaction });
 
+    // Commands from the control page (see remote.js). Dev: C = a random fighter attacks someone, X = a random
+    // fighter chats a non-word, T = a typo of someone's word, P = a chased fighter counters their chaser,
+    // R = a random fighter reacts.
+    this.commands = {
+      end: () => this.backToLobby(),
+      C: () => {
+        const alive = this.alive();
+        const victim = Phaser.Utils.Array.GetRandom(alive.filter((f) => f.word));
+        const attacker = Phaser.Utils.Array.GetRandom(alive.filter((f) => f !== victim));
+        if (victim && attacker) simulateChat(attacker.name, `${victim.word}!`);
+      },
+      X: () => {
+        const alive = this.alive();
+        if (alive.length) simulateChat(Phaser.Utils.Array.GetRandom(alive).name, 'where is everyone');
+      },
+      T: () => {
+        const alive = this.alive();
+        const victim = Phaser.Utils.Array.GetRandom(alive.filter((f) => f.word));
+        const sender = Phaser.Utils.Array.GetRandom(alive.filter((f) => f !== victim));
+        if (victim && sender) simulateChat(sender.name, victim.word + victim.word.at(-1));   // doubled last letter
+      },
+      P: () => {
+        const chaser = Phaser.Utils.Array.GetRandom(this.alive().filter((f) => f.word && this.fighterOf(f.character.target)));
+        if (chaser) simulateChat(this.fighterOf(chaser.character.target).name, chaser.word);
+      },
+      R: () => {
+        if (this.fighters.size) simulateReaction(Phaser.Utils.Array.GetRandom([...this.fighters.keys()]), Phaser.Utils.Array.GetRandom(FAKE_EMOJI));
+      },
+    };
     this.input.keyboard.on('keydown-ENTER', () => this.over && this.backToLobby());
-    // Dev: C = a random fighter attacks someone, X = a random fighter chats a non-word, T = a typo of someone's
-    // word, P = a chased fighter counters their chaser, R = a random fighter reacts.
-    this.input.keyboard.on('keydown-C', () => {
-      const alive = this.alive();
-      const victim = Phaser.Utils.Array.GetRandom(alive.filter((f) => f.word));
-      const attacker = Phaser.Utils.Array.GetRandom(alive.filter((f) => f !== victim));
-      if (victim && attacker) simulateChat(attacker.name, `${victim.word}!`);
-    });
-    this.input.keyboard.on('keydown-X', () => {
-      const alive = this.alive();
-      if (alive.length) simulateChat(Phaser.Utils.Array.GetRandom(alive).name, 'where is everyone');
-    });
-    this.input.keyboard.on('keydown-T', () => {
-      const alive = this.alive();
-      const victim = Phaser.Utils.Array.GetRandom(alive.filter((f) => f.word));
-      const sender = Phaser.Utils.Array.GetRandom(alive.filter((f) => f !== victim));
-      if (victim && sender) simulateChat(sender.name, victim.word + victim.word.at(-1));   // doubled last letter
-    });
-    this.input.keyboard.on('keydown-P', () => {
-      const chaser = Phaser.Utils.Array.GetRandom(this.alive().filter((f) => f.word && this.fighterOf(f.character.target)));
-      if (chaser) simulateChat(this.fighterOf(chaser.character.target).name, chaser.word);
-    });
-    this.input.keyboard.on('keydown-R', () => {
-      if (this.fighters.size) simulateReaction(Phaser.Utils.Array.GetRandom([...this.fighters.keys()]), Phaser.Utils.Array.GetRandom(FAKE_EMOJI));
-    });
+    for (const key of ['C', 'X', 'T', 'P', 'R']) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
+  }
+
+  // What the control page shows (see remote.js).
+  snapshot() {
+    return {
+      phase: 'battle',
+      over: this.over,
+      winner: this.winner?.name ?? null,
+      boost: this.suddenDeath ? 1 + this.suddenDeath * SUDDEN_DEATH_BOOST : 0,
+      maxHp: MAX_HP,
+      fighters: [...this.fighters.values()].map((f) => ({
+        name: f.name,
+        emoji: roster.get(f.name)?.emoji,
+        hp: f.hp,
+        word: f.word,
+        out: f.out,
+        chasing: this.fighterOf(f.character.target)?.name ?? null,
+        parrying: [...f.parries].map((p) => p.name),
+      })),
+      waiting: roster.all().filter((p) => !this.fighters.has(p.name)),   // joined mid-round
+      log: this.log,
+    };
   }
 
   update(time, delta) {
@@ -218,7 +239,6 @@ export class BattleScene extends Phaser.Scene {
     if (level === this.suddenDeath) return;
     if (level === 1 && this.suddenDeath === 0) this.banner('⚡ Sudden death!');
     this.suddenDeath = level;
-    this.refreshAlive();
   }
 
   // After WORD_DELAY, give the fighter a fresh word (they're attackable again).
@@ -247,7 +267,6 @@ export class BattleScene extends Phaser.Scene {
     for (const f of this.fighters.values()) {
       if (f.character.target === victim.character) f.character.cancelChase();
     }
-    this.refreshAlive();
 
     const alive = this.alive();
     if (alive.length === 1) this.win(alive[0]);
@@ -255,14 +274,14 @@ export class BattleScene extends Phaser.Scene {
 
   win(winner) {
     this.over = true;
+    this.winner = winner;
+    this.addLog(`👑 ${winner.name} wins`);
     for (const f of this.fighters.values()) f.character.cancelChase();
     winner.character.setBubble('🏆 Winner!', { highlight: true });
     this.tweens.add({ targets: winner.character, scale: 1.6, duration: 500, ease: 'Back.easeOut' });
 
     const shade = this.add.rectangle(WIDTH / 2, HEIGHT / 2, WIDTH, 200, 0x000000, 0.55).setDepth(20000);
-    const title = this.add.text(WIDTH / 2, HEIGHT / 2 - 30, `👑 ${winner.name} wins! 👑`, { fontSize: '56px', fontStyle: 'bold', color: '#ffd84d' }).setOrigin(0.5).setDepth(20001);
-    new Button(this, WIDTH / 2, HEIGHT / 2 + 50, 'Back to lobby', () => this.backToLobby(), { width: 240 }).setDepth(20001);
-    this.endButton.setVisible(false);
+    const title = this.add.text(WIDTH / 2, HEIGHT / 2, `👑 ${winner.name} wins! 👑`, { fontFamily: DISPLAY_FONT, fontSize: '64px', color: '#ffd84d' }).setOrigin(0.5).setDepth(20001);
     this.tweens.add({ targets: [shade, title], alpha: { from: 0, to: 1 }, duration: 400 });
     this.confetti();
   }
@@ -273,12 +292,6 @@ export class BattleScene extends Phaser.Scene {
     return [...this.fighters.values()].filter((f) => !f.out);
   }
 
-  refreshAlive() {
-    const standing = `${this.alive().length} of ${this.fighters.size} still standing`;
-    const boost = 1 + this.suddenDeath * SUDDEN_DEATH_BOOST;
-    this.aliveText.setText(this.suddenDeath ? `${standing}  ·  ⚡ chases ×${boost}` : standing).setColor(this.suddenDeath ? '#ffd84d' : '#aab0c8');
-  }
-
   fighterOf(character) {
     return character && [...this.fighters.values()].find((f) => f.character === character);
   }
@@ -286,11 +299,10 @@ export class BattleScene extends Phaser.Scene {
   addLog(line) {
     this.log.push(line);
     if (this.log.length > LOG_LINES) this.log.shift();
-    this.logText.setText(this.log);
   }
 
   banner(text) {
-    const t = this.add.text(WIDTH / 2, HEIGHT / 2, text, { fontSize: '96px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(20000);
+    const t = this.add.text(WIDTH / 2, HEIGHT / 2, text, { fontFamily: DISPLAY_FONT, fontSize: '96px', color: '#ffffff' }).setOrigin(0.5).setDepth(20000);
     this.tweens.add({ targets: t, scale: { from: 0.5, to: 1.2 }, alpha: { from: 1, to: 0 }, duration: 1200, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
   }
 

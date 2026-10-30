@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meet Game Control</title>
+  <style>
+    :root {
+      --bg: #1d1f27; --panel: #272a35; --line: #363a48; --text: #e8e8f0; --muted: #8b90a5;
+      --accent: #4f7cff; --grey: #6b6f80; --good: #6c6; --bad: #e66; --gold: #ffd84d;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 16px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    h1 { margin: 0; font-size: 20px; }
+    h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+    .pills { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill { font-size: 13px; padding: 3px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); }
+    .pill.good { color: var(--good); } .pill.bad { color: var(--bad); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    #summary { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+    #summary .gold { color: var(--gold); }
+    button { font: inherit; font-weight: 600; color: #fff; background: var(--accent); border: 0; border-radius: 10px; padding: 9px 16px; cursor: pointer; }
+    button.secondary { background: var(--grey); }
+    button:disabled { background: #444855; color: #888; cursor: default; }
+    button[hidden] { display: none; }
+    kbd { font: 12px ui-monospace, monospace; background: rgba(0,0,0,0.25); border-radius: 4px; padding: 1px 5px; margin-right: 6px; }
+    table { width: 100%; border-collapse: collapse; }
+    td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: middle; }
+    tr:first-child td { border-top: 0; }
+    td.emoji { width: 36px; font-size: 22px; text-align: center; }
+    td.name { font-weight: 600; }
+    td.word { font-family: ui-monospace, monospace; }
+    td.state { color: var(--muted); text-align: right; font-size: 13px; }
+    tr.out td { opacity: 0.4; }
+    .muted { color: var(--muted); }
+    #log { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
+    #missing { display: none; }
+    body.missing #missing { display: block; }
+    body.missing #game { display: none; }
+  </style>
+</head>
+<body class="missing">
+  <main>
+    <header>
+      <h1>Meet Game control</h1>
+      <div class="pills"><span id="game-status" class="pill bad">game page not open</span><span id="server-status" class="pill"></span></div>
+    </header>
+
+    <section id="missing">
+      Open the game at <a href="/" target="_blank" style="color: var(--accent)">localhost:8787</a> in another tab of this browser.
+      This page shows its state and controls it.
+    </section>
+
+    <div id="game" style="display: grid; gap: 16px;">
+      <section>
+        <div id="summary"></div>
+        <div class="row">
+          <button data-command="start">Start game ⚔️</button>
+          <button data-command="clear" class="secondary">Clear players</button>
+          <button data-command="end" class="secondary">End round</button>
+        </div>
+        <h2 style="margin-top: 16px;">Dev: fake events <span style="text-transform: none; letter-spacing: 0;">(keys work on the game page too)</span></h2>
+        <div class="row" id="dev"></div>
+      </section>
+
+      <section>
+        <h2 id="players-title">Players</h2>
+        <table><tbody id="players"></tbody></table>
+        <p id="waiting" class="muted" style="margin: 10px 0 0;"></p>
+      </section>
+
+      <section id="log-section">
+        <h2>Battle log</h2>
+        <ul id="log"></ul>
+      </section>
+    </div>
+  </main>
+  <script type="module" src="/src/control.js"></script>
+</body>
+</html>

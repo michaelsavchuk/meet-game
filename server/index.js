@@ -1,4 +1,5 @@
 // Game server: `npm start`, then open http://localhost:8787 and share that tab in Meet.
+// The host runs the game from http://localhost:8787/control in another tab.
 //
 //   extension --POST /messages, /reactions--> server --SSE /events--> Phaser game (game/)
 //
@@ -58,7 +59,8 @@ function serveStatic(req, res) {
   const url = decodeURIComponent(req.url.split('?')[0]);
   const prefix = url.startsWith('/vendor/') ? '/vendor/' : '/';
   const base = STATIC[prefix];
-  const file = path.join(base, url.slice(prefix.length) || 'index.html');
+  let file = path.join(base, url.slice(prefix.length) || 'index.html');
+  if (!path.extname(file)) file += '.html';   // /control -> control.html
   if (!file.startsWith(base + path.sep)) { res.statusCode = 403; return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.statusCode = 404; return res.end(); }

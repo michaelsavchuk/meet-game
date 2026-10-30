@@ -17,11 +17,16 @@ extension/ --POST /messages, /reactions--> server/ --SSE /events--> game/ (Phase
 - `game/src/bridge.js` re-emits server events on `game.events`. Scenes subscribe with
   `listen(this, { chat, reaction })`, which also unsubscribes on scene shutdown.
 - All game state lives in the browser (the server is only a relay); reloading the game page resets it.
+- The presented game shows only the game itself. Host controls, counts, the battle log and dev buttons are on
+  the control page (`/control` → `game/control.html` + `src/control.js`), opened in another tab of the same
+  browser. `src/remote.js` links them over a `BroadcastChannel`: the game posts the active scene's `snapshot()`
+  every 250 ms, and the control page sends command names that run the active scene's `commands[name]`
+  (`start`, `clear`, `end`, and the dev keys).
 
 ## The game
 Phases, one scene each (`game/src/scenes/`):
 1. **LobbyScene**: chatting anything joins (random character emoji); any reaction changes your emoji.
-   Host clicks Start (2+ players) or presses Enter. "Clear players" empties the roster.
+   Host clicks Start on the control page (2+ players) or presses Enter on the game. "Clear players" empties the roster.
 2. **BattleScene**: everyone in the roster gets a unique word (`words.js`) in a speech bubble. Typing
    another player's word (whole word, case-insensitive) makes your character chase and hit them.
    Rules: 3 HP, 1 per hit. The victim keeps their word while attackers run at them, so several
@@ -46,16 +51,16 @@ Phases, one scene each (`game/src/scenes/`):
    Chase visuals: targets show a wobbling "‼️" (with "×N" for several chasers; BattleScene recounts
    chasers every frame and calls `setAlert()`), and chasers leave a 💨 trail (`puff()`).
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.
-3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" / Enter keeps the roster.
+3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" (control page) / Enter keeps the roster.
 
 `art/arena.blend` renders the arena backdrop to `game/assets/arena.png` (Kenney Mini Dungeon tiles, flat texture +
 blue AO). Read `art/README.md` before editing it: layout, camera, and the shared `Toon Style` settings node.
 
-`HudScene` runs on top of everything (connection status, dev key hints). Other pieces:
+`HudScene` runs on top of everything and only shows "disconnected" when the server connection drops. Other pieces:
 `roster.js` (players across rounds, name → emoji), `objects/Character.js` (emoji whose hop rate follows
 its speed, sword, bubble, hearts, chase/hit, `separate()` to keep characters from stacking; a knockback flips
 the figure through the air, and a knockout flings it off screen into the `game/assets/ko.png` burst that
-BattleScene preloads), `objects/Button.js`, `config.js` (HP, speeds, sudden death timing, arena bounds and
+BattleScene preloads), `config.js` (HP, speeds, sudden death timing, arena bounds and
 other tuning; animation tuning lives at the top of Character.js).
 
 ## Conventions
@@ -70,7 +75,8 @@ other tuning; animation tuning lives at the top of Character.js).
 
 ## Running and testing
 - `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787. `PORT=… npm start` uses another port.
-- Dev keys (fake events go through the server like real ones): lobby **C** = a fake player joins,
+- Control page: http://localhost:8787/control in another tab of the same browser.
+- Dev keys on the game page, also buttons on the control page (fake events go through the server like real ones): lobby **C** = a fake player joins,
   **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat,
   **T** = a typo of someone's word, **P** = a chased fighter counters their chaser.
   Or `curl -XPOST localhost:8787/messages -d '{"id":"1","userId":"u","sender":"Ada","text":"hi","receivedAt":"t"}'`.

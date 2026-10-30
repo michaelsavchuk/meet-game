@@ -1,16 +1,16 @@
 import * as Phaser from 'phaser';
 import { isConnected } from '../bridge.js';
-import { WIDTH, HEIGHT } from '../config.js';
+import { WIDTH } from '../config.js';
 
-// Always-on overlay above the other scenes: server connection status and dev key hints.
+// Always-on overlay above the other scenes. It only shows a warning while the server connection is down;
+// everything else for the host is on the control page (control.html).
 export class HudScene extends Phaser.Scene {
   constructor() {
     super({ key: 'hud', active: true });
   }
 
   create() {
-    this.status = this.add.text(WIDTH - 20, 20, '', { fontSize: '16px' }).setOrigin(1, 0);
-    this.add.text(WIDTH - 12, HEIGHT - 6, 'dev: C fake chat/attack · X fake non-word chat · T fake typo · P fake counter · R fake reaction', { fontSize: '12px', color: '#5c6070' }).setOrigin(1, 1);
+    this.status = this.add.text(WIDTH - 20, 20, '○ disconnected', { fontSize: '16px', color: '#c66' }).setOrigin(1, 0);
     this.setStatus(isConnected());
 
     this.game.events.on('bridge-status', this.setStatus, this);
@@ -18,6 +18,6 @@ export class HudScene extends Phaser.Scene {
   }
 
   setStatus(connected) {
-    this.status.setText(connected ? '● connected' : '○ disconnected').setColor(connected ? '#6c6' : '#c66');
+    this.status.setVisible(!connected);
   }
 }

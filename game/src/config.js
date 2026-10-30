@@ -1,8 +1,11 @@
 // Gameplay tuning in one place.
 export const WIDTH = 1280;
 export const HEIGHT = 720;
-// Default for all game text (main.js). Noto Color Emoji only covers emoji code points, so other text stays Courier.
-export const FONT_FAMILY = "'Noto Color Emoji', Courier";
+// Default for all game text (main.js). Noto Color Emoji only covers emoji code points, so other text falls through
+// to Balsamiq Sans (Google Fonts, linked in index.html).
+export const FONT_FAMILY = "'Noto Color Emoji', 'Balsamiq Sans', Helvetica, Arial, sans-serif";
+// For big headline text: the flash banners and the winner title. Luckiest Guy has one (already heavy) weight.
+export const DISPLAY_FONT = "'Noto Color Emoji', 'Luckiest Guy', Impact, sans-serif";
 // Phaser sizes a text's canvas from this string's ascent/descent. Its default ('|MÉqgy') is shorter than Noto
 // emoji, which clipped their tops; 🏀 and 🤯 reach the font's highest and lowest points.
 export const TEST_STRING = '|MÉqgy🏀🤯';
