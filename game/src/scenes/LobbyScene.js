@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { listen, simulateChat, simulateReaction, FAKE_NAMES, FAKE_EMOJI } from '../bridge.js';
 import { roster } from '../roster.js';
 import { Character, separate } from '../objects/Character.js';
+import { FloorText } from '../objects/FloorText.js';
 import { CHAT_BUBBLE_MS } from '../config.js';
 
 const MIN_PLAYERS = 2;
@@ -21,6 +22,8 @@ export class LobbyScene extends Phaser.Scene {
   create() {
     this.characters = new Map();   // name -> Character
     this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
+    this.floorText = new FloorText(this);
+    this.updateFloorText();
 
     for (const player of roster.all()) this.addCharacter(player, { delay: Phaser.Math.Between(0, ENTER_STAGGER) });
 
@@ -74,7 +77,13 @@ export class LobbyScene extends Phaser.Scene {
   addCharacter(player, { delay = 0 } = {}) {
     const character = new Character(this, player).enter({ delay });
     this.characters.set(player.name, character);
+    this.updateFloorText();
     return character;
+  }
+
+  updateFloorText() {
+    const n = this.characters.size;
+    this.floorText.set('Chat to join!', `${n} player${n === 1 ? '' : 's'}`);
   }
 
   say(character, text) {
@@ -87,6 +96,7 @@ export class LobbyScene extends Phaser.Scene {
     roster.clear();
     for (const character of this.characters.values()) character.destroy();
     this.characters.clear();
+    this.updateFloorText();
   }
 
   startGame() {

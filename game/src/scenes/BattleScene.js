@@ -4,6 +4,7 @@ import { roster } from '../roster.js';
 import { pickWord, tokenize, nearMiss } from '../words.js';
 import { Character, separate, spreadSpots } from '../objects/Character.js';
 import { SpeedLines } from '../objects/SpeedLines.js';
+import { FloorText } from '../objects/FloorText.js';
 import {
   WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED, CHASE_SPEED, CLASH_KNOCKBACK,
   DISPLAY_FONT, SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX, COUNTDOWN, COUNTDOWN_STEP,
@@ -59,6 +60,7 @@ export class BattleScene extends Phaser.Scene {
     this.lastHitAt = this.time.now;   // for sudden death
     this.suddenDeath = 0;             // 0 = off, then 1, 2, ... as chases speed up
     this.speedLines = new SpeedLines(this);
+    this.floorText = new FloorText(this);
 
     // Everyone in the roster when the round starts plays; anyone who joins later waits for the next round.
     // They scramble in from the stairs to spread-out spots while the banner counts down, arriving just before it ends.
@@ -70,6 +72,8 @@ export class BattleScene extends Phaser.Scene {
         .enter({ spot: spots[i], delay, duration: countdown - ENTER_SLACK - delay });
       this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word: null, lastWord: null, out: false, revealTimer: null, parries: new Set() });
     }
+
+    this.updateFloorText();
 
     for (let n = COUNTDOWN; n > 0; n--) this.time.delayedCall((COUNTDOWN - n) * COUNTDOWN_STEP, () => this.banner(String(n)));
     this.time.delayedCall(countdown, () => this.fight());
@@ -312,6 +316,7 @@ export class BattleScene extends Phaser.Scene {
       if (f.character.target === victim.character) f.character.cancelChase();
     }
     if (winner) this.win(winner);
+    this.updateFloorText();
   }
 
   // The round ends as soon as the last opponent is knocked out; celebrate() follows once they've left the screen.
@@ -339,6 +344,12 @@ export class BattleScene extends Phaser.Scene {
 
   alive() {
     return [...this.fighters.values()].filter((f) => !f.out);
+  }
+
+  // "N players remain" on the floor, hidden once only the winner is left.
+  updateFloorText() {
+    const n = this.alive().length;
+    this.floorText.set(n > 1 ? `${n} players remain` : null);
   }
 
   fighterOf(character) {

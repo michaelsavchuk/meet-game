@@ -12,7 +12,9 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
 - **`Arena` collection**: everything the camera sees. 232 **linked duplicates** (they share mesh data with the pack
   originals, so editing an original's mesh or material updates every copy):
   - Floor: 13×8 grid of 1 m tiles centered on the origin (x −6..6, y −3.5..3.5). About 15% are `floor-detail`,
-    chosen with `random.Random(7)` so a rebuild comes out the same.
+    chosen with `random.Random(7)` so a rebuild comes out the same. Then the three that sat under the game's floor text
+    (`FloorText.js`, center of the screen) swapped meshes with plain tiles nearer the walls, so keep the band around
+    screen y 320–470 free of `floor-detail` if you rebuild.
   - Walls: a ring at x = ±7, y = ±4.5. Straight runs use `wall-half` (trim on its local −Y face), turned with
     `rotation_euler.z` so the trim faces the floor: back 0, front π, left π/2, right −π/2. Corners use
     `wall-corner`, a custom asset (in `Collection`): a `dirt` block with the pack's `column` scaled to

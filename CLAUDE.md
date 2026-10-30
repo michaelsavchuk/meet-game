@@ -64,7 +64,9 @@ blue AO). Read `art/README.md` before editing it: layout, camera, and the shared
 `roster.js` (players across rounds, name → emoji), `objects/Character.js` (emoji whose hop rate follows
 its speed, sword, bubble, hearts, chase/hit, `separate()` to keep characters from stacking; a knockback flips
 the figure through the air, and a knockout flings it off screen into the `game/assets/ko.png` burst that
-BattleScene preloads; `enter()` runs it in from off screen down a staircase in `STAIRS`), `config.js` (HP, speeds, sudden death timing, arena bounds and
+BattleScene preloads; `enter()` runs it in from off screen down a staircase in `STAIRS`), `objects/FloorText.js` (faint blue
+text painted on the floor under everyone: "Chat to join!" + player count in the lobby, "N players remain" in battle until
+one is left), `config.js` (HP, speeds, sudden death timing, arena bounds and
 other tuning; animation tuning lives at the top of Character.js).
 
 ## Conventions
