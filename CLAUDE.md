@@ -22,6 +22,9 @@ extension/ --POST /messages, /reactions--> server/ --SSE /events--> game/ (Phase
   browser. `src/remote.js` links them over a `BroadcastChannel`: the game posts the active scene's `snapshot()`
   every 250 ms, and the control page sends command names that run the active scene's `commands[name]`
   (`start`, `clear`, `end`, and the dev keys).
+- Play page (`/play` → `game/play.html`, self-contained): a fallback for when the extension can't read Meet. Players
+  pick a name and send chat/reactions in the extension's raw payload shape; it shows everyone's chat from `/events`.
+  It may be served through a tunnel (ngrok), so it uses relative URLs only and avoids secure-context-only APIs.
 
 ## The game
 Phases, one scene each (`game/src/scenes/`):

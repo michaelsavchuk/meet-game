@@ -40,6 +40,12 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
 3. Go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `extension/` folder.
 4. In the Meet call, open the chat panel and share the game tab (not the control page). Participants' chats and reactions show up in the game.
 
+### Without the extension
+If the extension can't read Meet, players can join from the play page instead: http://localhost:8787/play has a
+name box, a chat box and reaction buttons, and posts the same payloads the extension does. To reach it from other
+machines, expose the server (for example `ngrok http 8787`, or whatever `PORT` you used) and share `<public url>/play`.
+The page uses only relative URLs, so it works at any host or port. Keep sharing the game tab in Meet so players can see it.
+
 ## Game events
 Scenes subscribe on `this.game.events`:
 
