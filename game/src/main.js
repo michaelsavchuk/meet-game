@@ -6,6 +6,7 @@ import { WIDTH, HEIGHT, FONT_FAMILY, DISPLAY_FONT, TEST_STRING, DEV_EVENTS, DIFF
 import { LobbyScene } from './scenes/LobbyScene.js';
 import { BattleScene } from './scenes/BattleScene.js';
 import { SurvivalScene, coopDifficulty, setCoopDifficulty } from './scenes/SurvivalScene.js';
+import { HowToScene } from './scenes/HowToScene.js';
 import { HudScene } from './scenes/HudScene.js';
 import { BATTLE, backgroundChoice, setBackgroundChoice, currentBackground } from './backgrounds.js';
 
@@ -24,8 +25,8 @@ const game = new Phaser.Game({
   backgroundColor: '#1d1f27',
   // Fixed 16:9 canvas scaled to fit the window, so it looks the same in the Meet screen share.
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: WIDTH, height: HEIGHT },
-  // Lobby starts first; the HUD runs on top of every scene.
-  scene: [LobbyScene, BattleScene, SurvivalScene, HudScene],
+  // Lobby starts first; How to play opens over it; the HUD runs on top of every scene.
+  scene: [LobbyScene, BattleScene, SurvivalScene, HowToScene, HudScene],
 });
 
 connectBridge(game);

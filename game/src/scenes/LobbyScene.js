@@ -10,7 +10,7 @@ const MIN_PLAYERS = { battle: 2, survival: 1 };   // per game mode (scene key)
 const ENTER_STAGGER = 800;   // ms; on returning to the lobby, everyone starts running in within this
 
 // Phase 1: anyone who chats joins and gets a random emoji; reacting changes it. The host starts a battle or co-op from
-// the control page (or presses Enter for a battle).
+// the control page (or presses Enter for a battle). "How to play" (HowToScene) opens over it from the control page or H.
 export class LobbyScene extends Phaser.Scene {
   constructor() {
     super('lobby');
@@ -35,6 +35,7 @@ export class LobbyScene extends Phaser.Scene {
       start: () => this.startGame(),
       coop: () => this.startGame('survival'),
       clear: () => this.clearPlayers(),
+      howto: () => this.toggleHowTo(),
       C: () => {
         const free = FAKE_NAMES.filter((n) => !roster.has(n));
         simulateChat(Phaser.Utils.Array.GetRandom(free.length ? free : FAKE_NAMES), Phaser.Utils.Array.GetRandom(['hi!', 'hello', 'let me in', 'ready 🙌']));
@@ -44,6 +45,7 @@ export class LobbyScene extends Phaser.Scene {
       },
     };
     this.input.keyboard.on('keydown-ENTER', this.commands.start);
+    this.input.keyboard.on('keydown-H', this.commands.howto);
     for (const key of ['C', 'R']) {
       if (DEV_EVENTS) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
       else delete this.commands[key];
@@ -52,7 +54,7 @@ export class LobbyScene extends Phaser.Scene {
 
   // What the control page shows (see remote.js).
   snapshot() {
-    return { phase: 'lobby', canStart: roster.size >= MIN_PLAYERS.battle, canStartCoop: roster.size >= MIN_PLAYERS.survival, players: roster.all() };
+    return { phase: 'lobby', howTo: this.scene.isActive('howto'), canStart: roster.size >= MIN_PLAYERS.battle, canStartCoop: roster.size >= MIN_PLAYERS.survival, players: roster.all() };
   }
 
   update(time, delta) {
@@ -112,8 +114,15 @@ export class LobbyScene extends Phaser.Scene {
     this.updateFloorText();
   }
 
+  toggleHowTo() {
+    if (this.scene.isActive('howto')) this.scene.stop('howto');
+    else this.scene.launch('howto');
+  }
+
   // `mode` is the scene: 'battle' or 'survival' (co-op).
   startGame(mode = 'battle') {
-    if (roster.size >= MIN_PLAYERS[mode]) this.scene.start(mode);
+    if (roster.size < MIN_PLAYERS[mode]) return;
+    this.scene.stop('howto');
+    this.scene.start(mode);
   }
 }

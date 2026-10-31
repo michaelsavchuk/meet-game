@@ -56,6 +56,8 @@ function render(state) {
   button('coop').hidden = !lobby;
   button('coop').disabled = !state.canStartCoop;
   button('clear').hidden = !lobby;
+  button('howto').hidden = !lobby;
+  button('howto').textContent = state.howTo ? 'Hide how to play' : 'How to play ❓';
   button('end').hidden = lobby;
   button('end').textContent = state.over ? 'Back to lobby' : 'End round';
   $('log-section').hidden = lobby;

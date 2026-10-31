@@ -52,7 +52,9 @@ Phases, one scene each (`game/src/scenes/`):
 1. **LobbyScene**: chatting anything joins (random character emoji) and your character runs in from a random
    staircase; any reaction changes your emoji. Returning to the lobby, everyone runs in again.
    Host clicks Start battle on the control page (2+ players) or presses Enter on the game, or Start co-op (1+).
-   "Clear players" empties the roster.
+   "Clear players" empties the roster. "How to play" on the control page (or **H** on the game) toggles `HowToScene`
+   over the lobby: the three rules, one highlighted at a time, with a scripted looping demo of two characters (words
+   appear, an attack, a parry) and a pretend chat line; starting a game closes it.
 2. **BattleScene**: everyone in the roster runs in from a random staircase to spread-out spots (`spreadSpots()`)
    while the banner counts down 3-2-1 (`COUNTDOWN`), timed to arrive just before it ends. Then "Type to Fight!", and once that banner is gone (so it hides
    nobody's word) everyone gets a unique word (`words.js`) in a speech bubble; until then (`fighting` false) chat does nothing. Typing
