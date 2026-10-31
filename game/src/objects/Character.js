@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 import { WIDTH, HEIGHT, ARENA, STAIRS, arenaEdges, WANDER_SPEED, ENTER_SPEED, CHASE_SPEED, FLEE_RADIUS, ATTACK_RANGE, CHASE_TIMEOUT, PERSONAL_SPACE } from '../config.js';
 
 const WALL_MARGIN = 120;   // while fleeing, walls closer than this push back so nobody gets cornered

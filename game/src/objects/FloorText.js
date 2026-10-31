@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 import { WIDTH, ARENA, DISPLAY_FONT } from '../config.js';
 
 const TITLE_SIZE = 96;      // px

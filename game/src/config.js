@@ -71,3 +71,7 @@ export const HEART_NEAR = { min: 90, max: 220 };   // px from the hurt player it
 export const HEART_ANYWHERE = 0.25;                // chance it lands anywhere on the floor instead
 
 export const CHAT_BUBBLE_MS = 4000; // how long lobby chat stays above a character
+
+// Dev fake events: the game page's dev keys and the control page's "fake events" buttons (see the scenes' `commands`).
+// CPU players don't depend on this.
+export const DEV_EVENTS = false;

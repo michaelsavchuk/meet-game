@@ -1,40 +1,20 @@
-// Game server: `npm start`, then open http://localhost:8787 and share that tab in Meet.
-// The host runs the game from http://localhost:8787/control in another tab.
+// Optional dev server: `npm start`, then open http://localhost:8787 and http://localhost:8787/control.
+// The extension doesn't need it (it runs the game from its own pages, see game/extension/background.js);
+// it's for developing without reloading the extension, and for the /play page.
 //
-//   extension --POST /messages, /reactions--> server --SSE /events--> Phaser game (game/)
+//   /play or dev keys --POST /messages, /reactions--> server --SSE /events--> Phaser game (game/)
 //
-// The extension posts raw Meet events; the server normalizes them into game events and
+// Posts are raw Meet payloads; the server normalizes them into game events (game/src/events.js) and
 // streams them to every open game page. No dependencies beyond Node itself.
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { normalize } from '../game/src/events.js';
 
 const PORT = process.env.PORT || 8787;
-const ROOT = path.join(__dirname, '..');
-const STATIC = {
-  '/': path.join(ROOT, 'game'),
-  '/vendor/': path.join(ROOT, 'node_modules', 'phaser', 'dist'),
-};
+const ROOT = path.join(import.meta.dirname, '..', 'game');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.ttf': 'font/ttf' };
-
-// ---- Normalizing: every game event has { type, player: { id, name }, at, ... } ----
-// Chat and reactions identify people differently (Chat user id vs. Meet participant id),
-// so the display name is the only key the two share. The game keys players by name for now.
-const normalize = {
-  '/messages': (m) => ({
-    type: 'chat',
-    id: m.id,
-    player: { id: m.userId, name: m.sender ?? 'Unknown' },
-    text: m.text,
-    at: m.receivedAt,
-  }),
-  '/reactions': (r) => ({
-    type: 'reaction',
-    player: { id: r.participantId, name: r.sender ?? 'Unknown' },
-    emoji: r.emoji,
-    at: r.receivedAt,
-  }),
-};
+const ROUTES = { '/messages': normalize['chat-message'], '/reactions': normalize['meet-reaction'] };
 
 // ---- Broadcasting to game pages over Server-Sent Events ----
 const clients = new Set();
@@ -57,11 +37,9 @@ setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25000
 // ---- Static files ----
 function serveStatic(req, res) {
   const url = decodeURIComponent(req.url.split('?')[0]);
-  const prefix = url.startsWith('/vendor/') ? '/vendor/' : '/';
-  const base = STATIC[prefix];
-  let file = path.join(base, url.slice(prefix.length) || 'index.html');
+  let file = path.join(ROOT, url.slice(1) || 'index.html');
   if (!path.extname(file)) file += '.html';   // /control -> control.html
-  if (!file.startsWith(base + path.sep)) { res.statusCode = 403; return res.end(); }
+  if (!file.startsWith(ROOT + path.sep)) { res.statusCode = 403; return res.end(); }
   fs.readFile(file, (err, data) => {
     if (err) { res.statusCode = 404; return res.end(); }
     res.setHeader('Content-Type', MIME[path.extname(file)] ?? 'application/octet-stream');
@@ -71,7 +49,7 @@ function serveStatic(req, res) {
 
 http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const toEvent = normalize[req.url];
+  const toEvent = ROUTES[req.url];
 
   if (req.method === 'POST' && toEvent) {
     let body = '';

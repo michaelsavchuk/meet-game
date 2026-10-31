@@ -15,6 +15,10 @@ let lastSeen = 0;
 let devPhase = null;
 let cpus = {};   // name -> level of the CPU players (see bots.js)
 
+$('open-game').addEventListener('click', () => {
+  if (globalThis.chrome?.tabs) chrome.tabs.create({ url: chrome.runtime.getURL('index.html') });
+  else window.open('/', '_blank');
+});
 $('add-cpu').addEventListener('click', () => send('addCpu', $('cpu-level').value));
 $('remove-cpus').addEventListener('click', () => send('removeCpus'));
 document.querySelectorAll('[data-command]').forEach((button) => button.addEventListener('click', () => send(button.dataset.command)));
@@ -34,7 +38,7 @@ setInterval(() => {
 }, 500);
 
 function render(state) {
-  $('server-status').hidden = false;
+  $('server-status').hidden = !state.viaServer;   // the extension has no server to lose
   $('server-status').textContent = state.connected ? 'server connected' : 'server disconnected';
   $('server-status').className = `pill ${state.connected ? 'good' : 'bad'}`;
 
@@ -45,11 +49,12 @@ function render(state) {
   button('end').hidden = lobby;
   button('end').textContent = state.over ? 'Back to lobby' : 'End round';
   $('log-section').hidden = lobby;
+  $('dev-section').hidden = !state.devEvents;   // DEV_EVENTS in config.js
   renderDev(state.phase);
   cpus = state.cpus ?? {};
   const nCpus = Object.keys(cpus).length;
   $('remove-cpus').hidden = !lobby || !nCpus;
-  $('cpu-note').textContent = lobby ? 'CPUs join by chatting and play through the server like anyone else.' : 'CPUs added now join next round.';
+  $('cpu-note').textContent = lobby ? 'CPUs join by chatting and play through chat like anyone else.' : 'CPUs added now join next round.';
 
   if (lobby) renderLobby(state);
   else renderBattle(state);

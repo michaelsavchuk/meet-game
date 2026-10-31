@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 import { listen, simulateChat, simulateReaction, FAKE_EMOJI } from '../bridge.js';
 import { roster } from '../roster.js';
 import { pickWord, tokenize, nearMiss, HEART_WORDS } from '../words.js';
@@ -9,7 +9,7 @@ import { FloorText } from '../objects/FloorText.js';
 import {
   WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED, CHASE_SPEED, CLASH_KNOCKBACK,
   DISPLAY_FONT, SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX, COUNTDOWN, COUNTDOWN_STEP,
-  HEART_EVERY, HEART_LIFETIME, HEART_HEAL, HEART_NEAR, HEART_ANYWHERE,
+  HEART_EVERY, HEART_LIFETIME, HEART_HEAL, HEART_NEAR, HEART_ANYWHERE, DEV_EVENTS,
 } from '../config.js';
 
 const LOG_LINES = 30;   // shown on the control page
@@ -120,7 +120,10 @@ export class BattleScene extends Phaser.Scene {
       },
     };
     this.input.keyboard.on('keydown-ENTER', () => this.over && this.backToLobby());
-    for (const key of ['C', 'X', 'T', 'P', 'R', 'H', 'G']) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
+    for (const key of ['C', 'X', 'T', 'P', 'R', 'H', 'G']) {
+      if (DEV_EVENTS) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
+      else delete this.commands[key];
+    }
   }
 
   // The countdown's over: "Type to Fight!", and once it's gone (so it doesn't hide anyone's word) everyone gets a word

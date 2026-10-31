@@ -1,8 +1,8 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 import { isConnected } from '../bridge.js';
 import { WIDTH } from '../config.js';
 
-// Always-on overlay above the other scenes. It only shows a warning while the server connection is down;
+// Always-on overlay above the other scenes. It only shows a warning while the dev server connection is down;
 // everything else for the host is on the control page (control.html).
 export class HudScene extends Phaser.Scene {
   constructor() {

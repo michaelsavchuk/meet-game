@@ -1,8 +1,8 @@
-import * as Phaser from 'phaser';
-import { connectBridge, isConnected } from './bridge.js';
+import * as Phaser from '/vendor/phaser.js';
+import { connectBridge, isConnected, viaServer } from './bridge.js';
 import { connectRemote } from './remote.js';
 import { startBots, addBot, removeBots, botLevels } from './bots.js';
-import { WIDTH, HEIGHT, FONT_FAMILY, DISPLAY_FONT, TEST_STRING } from './config.js';
+import { WIDTH, HEIGHT, FONT_FAMILY, DISPLAY_FONT, TEST_STRING, DEV_EVENTS } from './config.js';
 import { LobbyScene } from './scenes/LobbyScene.js';
 import { BattleScene } from './scenes/BattleScene.js';
 import { HudScene } from './scenes/HudScene.js';
@@ -27,7 +27,7 @@ const game = new Phaser.Game({
 });
 
 connectBridge(game);
-connectRemote(game, () => ({ connected: isConnected(), cpus: botLevels() }), {
+connectRemote(game, () => ({ viaServer, devEvents: DEV_EVENTS, connected: isConnected(), cpus: botLevels() }), {
   addCpu: (level) => addBot(level),
   removeCpus: () => removeBots(game),
 });

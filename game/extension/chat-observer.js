@@ -4,10 +4,11 @@ console.log('chat observer v2');
 //  - chat.google.com (the chat frame Meet embeds, or a normal Chat tab): new chat messages  -> 'chat-message'
 //  - meet.google.com (the top-level call page): emoji reactions on video tiles              -> 'meet-reaction'
 
-// Hand off to the extension's background worker (also fires a DOM event so it works without an extension).
+// Hand off to the extension's game page (also fires a DOM event so it works without an extension).
+// Sending fails when the game isn't open, which is fine: there's nobody to play yet.
 function send(type, eventName, payload) {
   if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-    chrome.runtime.sendMessage({ type, payload });
+    chrome.runtime.sendMessage({ type, payload }).catch(() => {});
   }
   window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
 }

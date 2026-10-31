@@ -1,9 +1,9 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 import { listen, simulateChat, simulateReaction, FAKE_NAMES, FAKE_EMOJI } from '../bridge.js';
 import { roster } from '../roster.js';
 import { Character, separate } from '../objects/Character.js';
 import { FloorText } from '../objects/FloorText.js';
-import { CHAT_BUBBLE_MS } from '../config.js';
+import { CHAT_BUBBLE_MS, DEV_EVENTS } from '../config.js';
 
 const MIN_PLAYERS = 2;
 const ENTER_STAGGER = 800;   // ms; on returning to the lobby, everyone starts running in within this
@@ -42,7 +42,10 @@ export class LobbyScene extends Phaser.Scene {
       },
     };
     this.input.keyboard.on('keydown-ENTER', this.commands.start);
-    for (const key of ['C', 'R']) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
+    for (const key of ['C', 'R']) {
+      if (DEV_EVENTS) this.input.keyboard.on(`keydown-${key}`, this.commands[key]);
+      else delete this.commands[key];
+    }
   }
 
   // What the control page shows (see remote.js).

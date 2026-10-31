@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 
 // PG, 4–7 letters, easy to spell, unlikely to come up in normal chat by accident.
 export const WORDS = [

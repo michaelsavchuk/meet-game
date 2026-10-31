@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 import { WIDTH, HEIGHT } from '../config.js';
 
 // Anime action lines in the screen corners (sudden death): thin yellow wedges whose wide ends sit past the screen

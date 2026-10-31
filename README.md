@@ -3,15 +3,16 @@
 A game shown on a shared screen in Google Meet. Participants play by sending chat messages
 and in-call emoji reactions.
 
+It's a Chrome extension, and only the host needs it: no server to run, and everyone else just uses Meet.
+
 ```
-Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser game
+Meet tab (content script) --chrome.runtime messages--> game tab (Phaser, an extension page)
 ```
 
 | Folder       | What it is |
 |--------------|------------|
-| `extension/` | Chrome extension that watches Meet chat and tile reactions and POSTs them to the server. |
-| `server/`    | Node server (no dependencies). Normalizes events, streams them to the game, serves `game/`. |
-| `game/`      | Phaser front end. `src/bridge.js` turns server events into `game.events`; `LobbyScene` and `BattleScene` in `src/scenes/` are the game. |
+| `game/`      | The extension. `manifest.json`; `extension/` has the Meet content script and the toolbar button's background script; `index.html` is the game, `control.html` the host's control page; `src/bridge.js` turns Meet events into `game.events`; `LobbyScene` and `BattleScene` in `src/scenes/` are the game. |
+| `server/`    | Optional dev server (no dependencies): serves `game/` at localhost, relays fake events, and hosts the `/play` fallback page. |
 
 ## How to play
 1. **Lobby**: type anything in chat to join and get a random emoji character. React with any emoji to
@@ -30,30 +31,40 @@ Meet (extension) --POST /messages, /reactions--> server --SSE /events--> Phaser 
      "that's you!", "too late!" for an old word, or "busy!" mid-chase.
 3. **Winner**: the last player standing wins. **Back to lobby** (control page, or Enter) starts over with the same players.
 
-## Run it
-1. `npm install`, then `npm start` (or `npm run dev` to restart on server changes).
-2. Open http://localhost:8787 (the game you share) and http://localhost:8787/control in another tab of the same
-   browser. The control page shows the players, words, HP and battle log, and has the host buttons (Start, Clear
-   players, End round / Back to lobby) so none of that is on the shared screen.
-   **CPU players**: pick a level (Easy, Normal, Hard or Mixed) and click **Add CPU** on the control page. CPUs join
-   by chatting and play by typing words at their own speed, with typos, counters and heart grabs, so you can play with fewer people.
-   Dev buttons on the control page (or keys on the game page) send fake events through the server: **C** fake join
-   (lobby) or attack (battle), **X** fake non-word chat, **T** fake typo, **P** fake counter, **R** fake reaction.
-3. Go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `extension/` folder.
-4. In the Meet call, open the chat panel and share the game tab (not the control page). Participants' chats and reactions show up in the game.
+## Install
+- **From a clone**: go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `game/` folder.
+- **To share it**: `npm run package` makes `dist/meet-game.zip`, which you can upload to the Chrome Web Store (publish it
+  privately to your Google Workspace domain, unlisted, or publicly).
+
+## Host a game
+1. Join the Meet call and open its chat panel. If the call was already open when you installed the extension, reload it.
+2. Click the ⚔️ toolbar button. The game opens in a tab next to Meet, and the control page opens in the browser's side
+   panel (in another tab on browsers without a side panel). The control page shows the players, words, HP and battle
+   log, and has the host buttons (Start, Clear players, End round / Back to lobby), so none of that is on the shared screen.
+3. In Meet, present the game tab. Participants' chats and reactions show up in the game.
+
+**CPU players**: pick a level (Easy, Normal, Hard or Mixed) and click **Add CPU** on the control page. CPUs join
+by chatting and play by typing words at their own speed, with typos, counters and heart grabs, so you can play with fewer people.
+With `DEV_EVENTS = true` in `game/src/config.js`, dev buttons on the control page (or keys on the game page) send fake events: **C** fake join
+(lobby) or attack (battle), **X** fake non-word chat, **T** fake typo, **P** fake counter, **R** fake reaction.
+
+## Dev server
+`npm install`, then `npm start` (or `npm run dev` to restart on server changes) serves the same game at
+http://localhost:8787 and the control page at http://localhost:8787/control, so you can work on the game without
+reloading the extension. Events come from the dev keys, `curl`, or the play page instead of Meet.
 
 ### Without the extension
-If the extension can't read Meet, players can join from the play page instead: http://localhost:8787/play has a
+If the extension can't read Meet, players can join from the dev server's play page instead: http://localhost:8787/play has a
 name box, a chat box and reaction buttons, and posts the same payloads the extension does. To reach it from other
 machines, expose the server (for example `ngrok http 8787`, or whatever `PORT` you used) and share `<public url>/play`.
-The page uses only relative URLs, so it works at any host or port. Keep sharing the game tab in Meet so players can see it.
+The page uses only relative URLs, so it works at any host or port. Share the localhost game tab in Meet so players can see it.
 
 ## Game events
 Scenes subscribe on `this.game.events`:
 
 - `chat`: `{ type, id, player: { id, name }, text, at }`
 - `reaction`: `{ type, player: { id, name }, emoji, at }`
-- `bridge-status`: `true` / `false` when the server connection opens or drops
+- `bridge-status`: `true` / `false` when the dev server connection opens or drops (the extension is always connected)
 
 Chat and reactions use different ids for the same person (Chat user id vs. Meet participant id),
 so players are keyed by display name for now.
@@ -73,6 +84,7 @@ so players are keyed by display name for now.
   more than 30s old when they appear are treated as history. Meet re-renders messages under new ids, so the same
   sender + text again within 10s is dropped.
 - Messages already on screen when the page loads are treated as history and not sent.
-- `background.js` posts chats to `/messages` and reactions to `/reactions`.
+- The content script sends each chat (`chat-message`) and reaction (`meet-reaction`) with `chrome.runtime.sendMessage`,
+  which every open extension page receives; the game page normalizes them (`src/events.js`).
 
 Google changes these pages often, so these selectors can stop working without warning.

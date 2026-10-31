@@ -1,11 +1,11 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 import { simulateChat, simulateReaction, FAKE_EMOJI } from './bridge.js';
 import { roster } from './roster.js';
 import { MAX_HP } from './config.js';
 
 // CPU players, added from the control page. Each one plays like a person in the call: it reads the screen (the
 // active scene's state), takes a moment to react, "types" a word letter by letter at its own speed, sometimes makes
-// a typo and retypes it, and sends chat through the server like a real message, so the game treats it like anyone else.
+// a typo and retypes it, and sends chat the same way real messages arrive (simulateChat), so the game treats it like anyone else.
 // Bots live outside the scenes and follow the roster: they join by chatting, and "Clear players" drops them.
 
 const TICK_MS = 100;

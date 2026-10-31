@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 import { HEIGHT } from '../config.js';
 
 // A heart pickup (BattleScene): drops from the top of the screen onto a spot on the floor, its shadow growing there

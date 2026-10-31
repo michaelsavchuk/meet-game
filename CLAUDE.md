@@ -4,33 +4,44 @@ A game shown on a Google Meet screen share and played by participants through ch
 and in-call emoji reactions. See README.md for setup and the event shapes.
 
 ## Architecture
+`game/` is the Chrome extension (`game/manifest.json`, MV3) and also the dev server's web root, so its pages use
+root-absolute paths (`/assets/…`, `/src/…`, `/vendor/phaser.js`) that work at both `chrome-extension://<id>/` and
+`localhost:8787/`. Only the host installs it; players just chat and react in Meet.
 ```
-extension/ --POST /messages, /reactions--> server/ --SSE /events--> game/ (Phaser)
+extension:   Meet tab content script --chrome.runtime.sendMessage--> game page (index.html, an extension page)
+dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /events--> game page at localhost
 ```
-- `extension/chat-observer.js` is one content script that branches on hostname:
+- `game/extension/chat-observer.js` is one content script that branches on hostname:
   `chat.google.com` (the chat frame Meet embeds, injected with `all_frames`) → chat messages;
   `meet.google.com` (top frame) → reaction badges on video tiles, plus Meet's own built-in chat panel
-  (`observeMeetChat()`), which some calls use instead of the Chat frame. `background.js` routes each
-  type to its own server endpoint.
-- `server/index.js` normalizes raw extension payloads into game events
-  (`{ type: 'chat' | 'reaction', player: { id, name }, text | emoji, at }`), broadcasts them over
-  SSE, and serves `game/` plus Phaser from `node_modules/phaser/dist` at `/vendor/`.
-- `game/src/bridge.js` re-emits server events on `game.events`. Scenes subscribe with
+  (`observeMeetChat()`), which some calls use instead of the Chat frame. It sends raw payloads
+  (`chat-message` / `meet-reaction`) with `chrome.runtime.sendMessage`, which reaches the game page directly.
+- `game/extension/background.js` only handles the toolbar button: it opens the game in a tab next to the current one
+  and the control page in the side panel (`chrome.sidePanel`, global so it stays open across tabs), or in a tab where
+  the browser has no sidePanel API. `sidePanel.open()` must run before any `await` (user gesture).
+- `game/src/events.js` normalizes raw payloads into game events
+  (`{ type: 'chat' | 'reaction', player: { id, name }, text | emoji, at }`); shared by the bridge and the server.
+- `game/src/bridge.js` picks its transport: as an extension page (`chrome.runtime.id` set) it listens to
+  `chrome.runtime.onMessage` and fakes (`simulateChat()`) are delivered in-page; otherwise (`viaServer`) it uses SSE
+  and POSTs fakes to the server. Either way it re-emits events on `game.events`. Scenes subscribe with
   `listen(this, { chat, reaction })`, which also unsubscribes on scene shutdown.
-- All game state lives in the browser (the server is only a relay); reloading the game page resets it.
+- `server/index.js` (optional, ESM, Node built-ins only) is for developing without reloading the extension and for the
+  `/play` page: it normalizes POSTs, broadcasts them over SSE, and serves `game/`.
+- All game state lives in the game page; reloading it resets the game.
 - The presented game shows only the game itself. Host controls, counts, the battle log and dev buttons are on
-  the control page (`/control` → `game/control.html` + `src/control.js`), opened in another tab of the same
-  browser. `src/remote.js` links them over a `BroadcastChannel`: the game posts the active scene's `snapshot()`
+  the control page (`game/control.html` + `src/control.js`), in the side panel (or at `/control` with the dev
+  server).
+  Extension pages can't run inline scripts (MV3 CSP), so no import maps or inline `<script>` in `index.html`/`control.html`. `src/remote.js` links them over a `BroadcastChannel`: the game posts the active scene's `snapshot()`
   every 250 ms, and the control page sends command names that run the active scene's `commands[name]`
   (`start`, `clear`, `end`, and the dev keys). Commands can carry one `arg`; `connectRemote()` also takes scene-independent
   commands (`addCpu`, `removeCpus`).
 - CPU players (`src/bots.js`): added from the control page (easy/normal/hard/mixed), they run in the game page outside
-  the scenes, read the active scene's state every 100 ms, and send chat through the server with `simulateChat()` like
+  the scenes, read the active scene's state every 100 ms, and send chat through the bridge with `simulateChat()` like
   anyone else. Each has its own typing speed (WPM), reaction time, typo rate (sends a typo, then retypes it), chance to
   notice a chaser and counter, heart greed, and targeting style (`STYLES`), varied a little per bot from `LEVELS`.
   They join by saying hi, leave when the roster is cleared, and "Remove CPUs" (lobby only) uses `LobbyScene.removePlayer()`.
   Phaser pauses in a background tab, so keep the game tab in front for CPUs to play.
-- Play page (`/play` → `game/play.html`, self-contained): a fallback for when the extension can't read Meet. Players
+- Play page (`/play` → `game/play.html`, self-contained, dev server only; left out of `npm run package`): a fallback for when the extension can't read Meet. Players
   pick a name and send chat/reactions in the extension's raw payload shape; it shows everyone's chat from `/events`.
   It may be served through a tunnel (ngrok), so it uses relative URLs only and avoids secure-context-only APIs.
 
@@ -77,7 +88,7 @@ Phases, one scene each (`game/src/scenes/`):
 `art/arena.blend` renders the arena backdrop to `game/assets/arena.png` (Kenney Mini Dungeon tiles, flat texture +
 blue AO). Read `art/README.md` before editing it: layout, camera, and the shared `Toon Style` settings node.
 
-`HudScene` runs on top of everything and only shows "disconnected" when the server connection drops. Other pieces:
+`HudScene` runs on top of everything and only shows "disconnected" when the dev server connection drops (never in the extension). Other pieces:
 `roster.js` (players across rounds, name → emoji), `objects/Character.js` (emoji whose hop rate follows
 its speed, sword, bubble, hearts, chase/hit, `separate()` to keep characters from stacking; a knockback flips
 the figure through the air, and a knockout flings it off screen into the `game/assets/ko.png` burst that
@@ -88,7 +99,9 @@ other tuning; animation tuning lives at the top of Character.js).
 
 ## Conventions
 - No dependencies beyond Phaser and no build step: the server uses only Node built-ins, and the
-  game is native ES modules with an import map (`import * as Phaser from 'phaser'`).
+  game is native ES modules. Phaser is vendored at `game/vendor/phaser.js` (the minified ESM build, committed so the
+  extension loads straight from a clone); import it as `import * as Phaser from '/vendor/phaser.js'`. After
+  upgrading the `phaser` devDependency, `npm run vendor` copies it in.
 - **Phaser 4** (4.2.x), not Phaser 3. Most basic APIs match, but check v4 docs/source in
   `node_modules/phaser` before assuming a v3 API exists.
 - Game canvas is a fixed 1280×720, scaled with `Scale.FIT`. Keep text large enough to read in a screen share.
@@ -97,15 +110,18 @@ other tuning; animation tuning lives at the top of Character.js).
 - Commit directly to `main`; no feature branches for now.
 
 ## Running and testing
-- `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787. `PORT=… npm start` uses another port.
-- Control page: http://localhost:8787/control in another tab of the same browser.
-- Dev keys on the game page, also buttons on the control page (fake events go through the server like real ones): lobby **C** = a fake player joins,
+- Extension: chrome://extensions → Developer mode → Load unpacked → `game/`. Click the toolbar button (best from a Meet
+  tab). After changing `game/`, reload the extension there and reopen its pages; after changing the content script, also
+  reload the Meet tab (content scripts only start on page load, including after a fresh install).
+- `npm run package` zips `game/` into `dist/meet-game.zip` for the Chrome Web Store or sharing.
+- Dev server: `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787, control page at
+  http://localhost:8787/control in another tab of the same browser. `PORT=… npm start` uses another port.
+- Dev keys on the game page, also buttons on the control page, when `DEV_EVENTS` is true in `config.js` (default false; fake events take the same path as real ones): lobby **C** = a fake player joins,
   **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat,
   **T** = a typo of someone's word, **P** = a chased fighter counters their chaser,
   **H** = drop a heart now, **G** = a random fighter goes for the heart.
   Or `curl -XPOST localhost:8787/messages -d '{"id":"1","userId":"u","sender":"Ada","text":"hi","receivedAt":"t"}'`.
 - `window.game` is the Phaser game, e.g. `game.scene.getScene('battle').fighters` in the console.
-- After changing `extension/`, reload it in chrome://extensions.
 
 ## Gotchas
 - Meet/Chat DOM selectors are fragile. Prefer semantic attributes (`role`, `data-*`, `aria-*`, ids)

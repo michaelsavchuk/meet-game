@@ -1,4 +1,4 @@
-import * as Phaser from 'phaser';
+import * as Phaser from '/vendor/phaser.js';
 
 // Everyone who has joined, kept across rounds so people don't have to rejoin after each game.
 // Keyed by display name (the only id chat and reactions share; see CLAUDE.md).

@@ -40,6 +40,16 @@
     .cpu { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 6px; }
     #log { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
     #missing { display: none; }
+    /* The side panel is narrow. */
+    @media (max-width: 480px) {
+      main { padding: 12px 10px 24px; gap: 12px; }
+      section { padding: 12px; }
+      #summary { font-size: 16px; }
+      button { padding: 8px 12px; }
+      td { padding: 5px 2px; }
+      td.emoji { width: 28px; font-size: 18px; }
+      td.state { font-size: 12px; }
+    }
     body.missing #missing { display: block; }
     body.missing #game { display: none; }
   </style>
@@ -52,8 +62,9 @@
     </header>
 
     <section id="missing">
-      Open the game at <a href="/" target="_blank" style="color: var(--accent)">localhost:8787</a> in another tab of this browser.
-      This page shows its state and controls it.
+      <p style="margin: 0 0 12px;">The game isn't open. Open it in a tab of this browser and share that tab in Meet;
+      this page shows its state and controls it.</p>
+      <button id="open-game">Open the game 🎮</button>
     </section>
 
     <div id="game" style="display: grid; gap: 16px;">
@@ -64,8 +75,10 @@
           <button data-command="clear" class="secondary">Clear players</button>
           <button data-command="end" class="secondary">End round</button>
         </div>
-        <h2 style="margin-top: 16px;">Dev: fake events <span style="text-transform: none; letter-spacing: 0;">(keys work on the game page too)</span></h2>
-        <div class="row" id="dev"></div>
+        <div id="dev-section">
+          <h2 style="margin-top: 16px;">Dev: fake events <span style="text-transform: none; letter-spacing: 0;">(keys work on the game page too)</span></h2>
+          <div class="row" id="dev"></div>
+        </div>
       </section>
 
       <section>
