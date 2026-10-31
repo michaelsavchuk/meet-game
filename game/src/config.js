@@ -63,9 +63,9 @@ export const SUDDEN_DEATH_STEP = 4000;
 export const SUDDEN_DEATH_BOOST = 0.5;
 export const SUDDEN_DEATH_MAX = 5;
 
-// Heart pickups: one at a time drops in every HEART_EVERY ms (random within) while someone is hurt, landing near
+// Heart pickups: one at a time is thrown in every HEART_EVERY ms (random within) while someone is hurt, landing near
 // a hurt player (more likely the more HP they're missing). Typing its word sends you to grab it for +HEART_HEAL HP;
-// if nobody does within HEART_LIFETIME ms (counted from landing) it fades away. None drop during sudden death.
+// if nobody does within HEART_LIFETIME ms (counted from landing) it runs off. None drop during sudden death.
 export const HEART_EVERY = { min: 10000, max: 18000 };
 export const HEART_LIFETIME = 12000;
 export const HEART_HEAL = 1;

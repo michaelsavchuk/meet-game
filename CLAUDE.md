@@ -94,11 +94,12 @@ Phases, one scene each (`game/src/scenes/`):
    Chase visuals: targets show a wobbling "‼️" (with "×N" for several chasers; BattleScene recounts
    chasers every frame and calls `setAlert()`), and chasers leave a 💨 trail (`puff()`).
    Hearts (`objects/Heart.js`, `dropHeart()`): every `HEART_EVERY` ms, if someone is hurt and it isn't sudden death,
-   one 💖 drops from the top of the screen (shadow grows at the landing spot), then floats in a spinning sunburst with a
-   pulsing glow and orbiting ✨, under a pink bubble with a longer, trickier word (`HEART_WORDS`). `heartSpot()` lands
+   one 💖 is thrown in from the nearer side, flipping through the air like a knockback, then hops in place (like a
+   character walking, but higher) in a spinning sunburst with a pulsing glow, under a pink bubble with a longer, trickier word (`HEART_WORDS`). `heartSpot()` lands
    it near a hurt fighter (weighted by missing HP squared, so the neediest usually wins the race), or anywhere
    (`HEART_ANYWHERE`). Typing its word chases it like an attack; the first to arrive gets +`HEART_HEAL` HP (full-HP
-   players can still grab it to deny it), other runners get "too late!". It fades after `HEART_LIFETIME` ms.
+   players can still grab it to deny it), other runners get "too late!". After `HEART_LIFETIME` ms it runs off up the nearest
+   stairs (`exitPath()` in Character.js).
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.
 3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" (control page) / Enter keeps the roster.
 

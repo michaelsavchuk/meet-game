@@ -196,7 +196,6 @@ export class BattleScene extends Phaser.Scene {
       this.steer(fighter, chasedBy, alive.filter((c) => c !== character), delta);
     }
     for (const character of characters) character.update(time, delta);
-    this.heart?.update(time, delta);
   }
 
   // Players run away while typing a new word (word === null) and, a bit slower, while being chased.

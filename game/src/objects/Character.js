@@ -118,13 +118,24 @@ export function spreadSpots(count) {
   return spots;
 }
 
-// A way in from a random staircase (STAIRS): from off screen, down the stairs to their foot, then across to `spot`.
-// The points are character positions, not feet.
-function entryPath(spot) {
-  const { foot, off } = Phaser.Utils.Array.GetRandom(STAIRS);
-  const t = Phaser.Math.FloatBetween(0.2, 0.8);   // where across the stairs' width
+// A line down a staircase (one of STAIRS) at a random spot across its width: [its foot, off screen]. The points are
+// character positions, not feet.
+function stairsPath({ foot, off }) {
+  const t = Phaser.Math.FloatBetween(0.2, 0.8);
   const at = ([[ax, ay], [bx, by]]) => ({ x: ax + (bx - ax) * t, y: ay + (by - ay) * t - FEET });
-  return [at(off), at(foot), spot];
+  return [at(foot), at(off)];
+}
+
+// A way in from a random staircase: from off screen, down the stairs to their foot, then across to `spot`.
+function entryPath(spot) {
+  const [foot, off] = stairsPath(Phaser.Utils.Array.GetRandom(STAIRS));
+  return [off, foot, spot];
+}
+
+// A way out from (x, y) by the nearest staircase: across to its foot, then up the stairs and off screen.
+export function exitPath({ x, y }) {
+  const distance = ({ foot: [[ax, ay], [bx, by]] }) => Math.hypot((ax + bx) / 2 - x, (ay + by) / 2 - FEET - y);
+  return stairsPath(STAIRS.reduce((best, s) => (distance(s) < distance(best) ? s : best)));
 }
 
 // Nudge wandering characters apart so they don't stack. Chasers, airborne, entering and knocked-out characters are
