@@ -46,6 +46,9 @@ dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /even
 - Play page (`/play` → `game/play.html`, self-contained, dev server only; left out of `npm run package`): a fallback for when the extension can't read Meet. Players
   pick a name and send chat/reactions in the extension's raw payload shape; it shows everyone's chat from `/events`.
   It may be served through a tunnel (ngrok), so it uses relative URLs only and avoids secure-context-only APIs.
+- Solo page (`/solo` → `game/solo.html` + `src/solo.js`, dev server only, left out of `npm run package`): the game in an
+  iframe on the left, and the play and control pages as tabs on the right, for playing without Meet. The frames are
+  same-origin, so SSE and the `BroadcastChannel` work between them unchanged.
 
 ## The game
 Phases, one scene each (`game/src/scenes/`):

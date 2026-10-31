@@ -70,6 +70,10 @@ name box, a chat box and reaction buttons, and posts the same payloads the exten
 machines, expose the server (for example `ngrok http 8787`, or whatever `PORT` you used) and share `<public url>/play`.
 The page uses only relative URLs, so it works at any host or port. Share the localhost game tab in Meet so players can see it.
 
+### Solo
+http://localhost:8787/solo puts everything on one page: the game on the left, and the play and control pages as tabs on
+the right. Add CPUs and start from the Control tab, and type as yourself from the Play tab.
+
 ## Game events
 Scenes subscribe on `this.game.events`:
 

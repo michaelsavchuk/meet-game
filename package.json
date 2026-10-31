@@ -8,7 +8,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "vendor": "cp node_modules/phaser/dist/phaser.esm.min.js game/vendor/phaser.js",
-    "package": "mkdir -p dist && rm -f dist/meet-game.zip && cd game && zip -r ../dist/meet-game.zip . -x '.*' 'play.html'"
+    "package": "mkdir -p dist && rm -f dist/meet-game.zip && cd game && zip -r ../dist/meet-game.zip . -x '.*' 'play.html' 'solo.html' 'src/solo.js'"
   },
   "devDependencies": {
     "phaser": "^4.2.1"

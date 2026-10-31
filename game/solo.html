@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Meet Game Solo</title>
+  <style>
+    :root {
+      --bg: #1d1f27; --panel: #272a35; --line: #363a48; --text: #e8e8f0; --muted: #8b90a5; --accent: #4f7cff;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif;
+      display: flex; }
+    iframe { display: block; width: 100%; height: 100%; border: 0; }
+    #game { flex: 1; min-width: 0; background: #000; }
+    aside { width: 420px; flex: none; display: flex; flex-direction: column; border-left: 1px solid var(--line); }
+    nav { display: flex; background: var(--panel); border-bottom: 1px solid var(--line); }
+    nav button { flex: 1; font: inherit; font-weight: 600; color: var(--muted); background: none; border: 0;
+      border-bottom: 2px solid transparent; padding: 12px; cursor: pointer; }
+    nav button[aria-selected="true"] { color: var(--text); border-bottom-color: var(--accent); }
+    .panes { flex: 1; min-height: 0; }
+    .panes iframe[hidden] { display: none; }
+    /* Narrow windows: game on top at 16:9, tabs below. */
+    @media (max-width: 800px) {
+      body { flex-direction: column; }
+      #game { flex: none; aspect-ratio: 16 / 9; height: auto; }
+      aside { width: auto; flex: 1; min-height: 0; border-left: 0; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Everything on one page for playing without Meet: the game, the play page (you) and the control page
+       (start, CPUs). They're same-origin, so the frames talk through the server and BroadcastChannel as usual. -->
+  <iframe id="game" src="/" title="Game"></iframe>
+  <aside>
+    <nav role="tablist">
+      <button role="tab" data-pane="play">Play</button>
+      <button role="tab" data-pane="control">Control</button>
+    </nav>
+    <div class="panes">
+      <iframe id="play" src="/play" title="Play"></iframe>
+      <iframe id="control" src="/control" title="Control"></iframe>
+    </div>
+  </aside>
+  <script src="/src/solo.js"></script>
+</body>
+</html>
