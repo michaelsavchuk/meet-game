@@ -4,7 +4,7 @@ import { WIDTH, HEIGHT, ARENA, STAIRS, arenaEdges, WANDER_SPEED, ENTER_SPEED, CH
 const WALL_MARGIN = 120;   // while fleeing, walls closer than this push back so nobody gets cornered
 const FEET = 24;           // the emoji's bottom, below the character's position; feet stay on the ARENA floor
 const HALF_WIDTH = 26;     // keeps the emoji's sides off the side walls
-const PUFF_EVERY = 0.06;   // seconds between 💨 puffs while charging
+const PUFF_EVERY = 0.12;   // seconds between 💨 puffs while charging
 // Hops speed up with movement: one per HOP_STRIDE px travelled (~1.8/s while wandering), kept within these rates.
 const HOP_STRIDE = 40;
 const HOP_RATE = { min: 1.2, max: 7 };   // hops per second
