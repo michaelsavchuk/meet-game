@@ -46,7 +46,7 @@ setInterval(() => {
 }, 500);
 
 function render(state) {
-  $('server-status').hidden = !state.viaServer;   // the extension has no server to lose
+  $('server-status').hidden = state.mode !== 'server';   // the extension and solo page have no server to lose
   $('server-status').textContent = state.connected ? 'server connected' : 'server disconnected';
   $('server-status').className = `pill ${state.connected ? 'good' : 'bad'}`;
 

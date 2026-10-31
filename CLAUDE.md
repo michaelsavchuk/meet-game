@@ -10,6 +10,7 @@ root-absolute paths (`/assets/…`, `/src/…`, `/vendor/phaser.js`) that work a
 ```
 extension:   Meet tab content script --chrome.runtime.sendMessage--> game page (index.html, an extension page)
 dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /events--> game page at localhost
+solo/static: play.html?local --BroadcastChannel--> game page (index.html?local), no server; CPUs and fakes in-page
 ```
 - `game/extension/chat-observer.js` is one content script that branches on hostname:
   `chat.google.com` (the chat frame Meet embeds, injected with `all_frames`) → chat messages;
@@ -23,10 +24,13 @@ dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /even
   `background.scripts` (Firefox event page); each browser uses its own.
 - `game/src/events.js` normalizes raw payloads into game events
   (`{ type: 'chat' | 'reaction', player: { id, name }, text | emoji, at }`); shared by the bridge and the server.
-- `game/src/bridge.js` picks its transport: as an extension page (`chrome.runtime.id` set) it listens to
-  `chrome.runtime.onMessage` and fakes (`simulateChat()`) are delivered in-page; otherwise (`viaServer`) it uses SSE
-  and POSTs fakes to the server. Either way it re-emits events on `game.events`. Scenes subscribe with
-  `listen(this, { chat, reaction })`, which also unsubscribes on scene shutdown.
+- `game/src/bridge.js` picks one of three transports (`mode`, a `TRANSPORTS` entry with `connect()` and `send()`):
+  `extension` (`chrome.runtime.id` set) listens to `chrome.runtime.onMessage`; `server` uses SSE and POSTs fakes
+  (`simulateChat()`) to the server; `local` (`?local` in the URL) takes raw payloads from the play page on a
+  `BroadcastChannel` (`LOCAL_CHANNEL`) and echoes every event back on it. Extension and local deliver fakes in-page.
+  Every transport re-emits events on `game.events`, and only bridge.js knows which one is in use: scenes subscribe with
+  `listen(this, { chat, reaction })` (which also unsubscribes on scene shutdown) and send with `simulateChat()`.
+  A change to how events get in or out goes in every transport.
 - `server/index.js` (optional, ESM, Node built-ins only) is for developing without reloading the extension and for the
   `/play` page: it normalizes POSTs, broadcasts them over SSE, and serves `game/`.
 - All game state lives in the game page; reloading it resets the game.
@@ -46,9 +50,14 @@ dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /even
 - Play page (`/play` → `game/play.html`, self-contained, dev server only; left out of `npm run package`): a fallback for when the extension can't read Meet. Players
   pick a name and send chat/reactions (any emoji, from an emoji picker) in the extension's raw payload shape; it shows everyone's chat from `/events`.
   It may be served through a tunnel (ngrok), so it uses relative URLs only and avoids secure-context-only APIs.
-- Solo page (`/solo` → `game/solo.html` + `src/solo.js`, dev server only, left out of `npm run package`): the game in an
-  iframe on the left, and the play and control pages as tabs on the right, for playing without Meet. The frames are
-  same-origin, so SSE and the `BroadcastChannel` work between them unchanged.
+  Its `send()`/`onEvent()` use the server, or with `?local` the same `BroadcastChannel` as bridge.js's local transport.
+- Solo page (`/solo` → `game/solo.html` + `src/solo.js`, left out of `npm run package`): the game in an iframe on the
+  left, and the play and control pages as tabs on the right, for playing alone (with CPUs) without Meet or a server.
+  Its frames load the game and play page with `?local`, and use full file names (`/index.html`, `/play.html`) so they
+  work on any static host.
+- Static site (`npm run build:web` → `scripts/build-web.js` → `dist/web/`; `netlify.toml` builds and publishes it): all of
+  `game/` except the extension's own files (so new game files are included), with the solo page as `index.html` and the
+  game page renamed to `game.html`.
 
 ## The game
 Phases, one scene each (`game/src/scenes/`):
@@ -139,6 +148,8 @@ other tuning; animation tuning lives at the top of Character.js).
 - Game canvas is a fixed 1280×720, scaled with `Scale.FIT`. Keep text large enough to read in a screen share.
 - Emoji use Google's Noto Color Emoji (`game/fonts/Noto-COLRv1.ttf`, `@font-face` in `index.html`). `main.js` makes
   `FONT_FAMILY` the default for every `scene.add.text()` and loads the font before the game starts.
+- Game features must work in all three modes (extension, dev server, solo/static), so they talk only through
+  bridge.js and `remote.js` and never need the server: nothing beyond the event relay belongs in `server/`.
 - Commit directly to `main`; no feature branches for now.
 
 ## Running and testing
@@ -146,6 +157,8 @@ other tuning; animation tuning lives at the top of Character.js).
   tab). After changing `game/`, reload the extension there and reopen its pages; after changing the content script, also
   reload the Meet tab (content scripts only start on page load, including after a fresh install).
 - `npm run package` zips `game/` into `dist/meet-game.zip` for the Chrome Web Store or sharing.
+- `npm run build:web` builds the static solo site into `dist/web/`; try it with any static server, e.g.
+  `python3 -m http.server -d dist/web`.
 - Dev server: `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787, control page at
   http://localhost:8787/control in another tab of the same browser. `PORT=… npm start` uses another port.
 - Dev keys on the game page, also buttons on the control page, when `DEV_EVENTS` is true in `config.js` (default false; fake events take the same path as real ones): lobby **C** = a fake player joins,

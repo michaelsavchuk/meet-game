@@ -30,17 +30,19 @@
   </style>
 </head>
 <body>
-  <!-- Everything on one page for playing without Meet: the game, the play page (you) and the control page
-       (start, CPUs). They're same-origin, so the frames talk through the server and BroadcastChannel as usual. -->
-  <iframe id="game" src="/" title="Game"></iframe>
+  <!-- Everything on one page for playing alone without Meet or a server: the game, the play page (you) and the
+       control page (start, CPUs). ?local makes the game and play page talk over a BroadcastChannel (bridge.js), so
+       this also works as a static site (npm run build:web, which serves this page as index.html and renames the game
+       to game.html). Full file names, so the frames load on any static host. -->
+  <iframe id="game" src="/index.html?local" title="Game"></iframe>
   <aside>
     <nav role="tablist">
       <button role="tab" data-pane="play">Play</button>
       <button role="tab" data-pane="control">Control</button>
     </nav>
     <div class="panes">
-      <iframe id="play" src="/play" title="Play"></iframe>
-      <iframe id="control" src="/control" title="Control"></iframe>
+      <iframe id="play" src="/play.html?local" title="Play"></iframe>
+      <iframe id="control" src="/control.html" title="Control"></iframe>
     </div>
   </aside>
   <script src="/src/solo.js"></script>

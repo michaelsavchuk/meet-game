@@ -46,7 +46,7 @@
 
     <!-- Step 1: pick a display name (it's the player key in the game). -->
     <section id="join">
-      <p style="margin-top: 0">Pick a name to play with. Watch the game on the shared screen.</p>
+      <p style="margin-top: 0">Pick a name to play with.<span id="watch"> Watch the game on the shared screen.</span></p>
       <form id="name-form">
         <input id="name" maxlength="30" placeholder="Your name" autocomplete="nickname" required>
         <button>Join</button>
@@ -94,13 +94,33 @@
       (name ? $('text') : $('name')).focus();
     }
 
-    async function post(path, body) {
+    // ---- Transport: the dev server, or with ?local (the solo page) the game in another frame (see bridge.js) ----
+    // send() posts a raw payload; onEvent() gets every normalized event the game sees, including your own.
+    const local = new URLSearchParams(location.search).has('local');
+    const channel = local && new BroadcastChannel('meet-game-events');   // bridge.js LOCAL_CHANNEL
+    const ROUTES = { 'chat-message': 'messages', 'meet-reaction': 'reactions' };
+
+    async function send(kind, payload) {
+      if (local) return channel.postMessage({ type: 'payload', kind, payload });
       try {
-        const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const res = await fetch(ROUTES[kind], { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         if (!res.ok) throw new Error(res.status);
       } catch {
         setStatus(false);
       }
+    }
+
+    function onEvent(fn) {
+      if (local) {
+        channel.onmessage = ({ data }) => { if (data.type === 'event') fn(data.event); };
+        $('status').textContent = 'solo';
+        $('watch').hidden = true;   // the game is right beside this page
+        return;
+      }
+      const source = new EventSource('events');
+      source.onopen = () => setStatus(true);
+      source.onerror = () => setStatus(false);
+      source.onmessage = (e) => fn(JSON.parse(e.data));
     }
 
     $('name-form').addEventListener('submit', (e) => {
@@ -122,11 +142,11 @@
       const text = $('text').value.trim();
       if (!text) return;
       $('text').value = '';
-      post('messages', { id: uid(), userId, sender: name, text, receivedAt: new Date().toISOString() });
+      send('chat-message', { id: uid(), userId, sender: name, text, receivedAt: new Date().toISOString() });
     });
 
     $('picker').addEventListener('emoji-click', (e) =>
-      post('reactions', { emoji: e.detail.unicode, participantId: userId, sender: name, receivedAt: new Date().toISOString() }));
+      send('meet-reaction', { emoji: e.detail.unicode, participantId: userId, sender: name, receivedAt: new Date().toISOString() }));
 
     // ---- Feed: everyone's chat, from the same event stream the game reads ----
     function setStatus(ok) {
@@ -147,10 +167,7 @@
       if (atBottom) feed.scrollTop = feed.scrollHeight;
     }
 
-    const source = new EventSource('events');
-    source.onopen = () => setStatus(true);
-    source.onerror = () => setStatus(false);
-    source.onmessage = (e) => addToFeed(JSON.parse(e.data));
+    onEvent(addToFeed);
 
     showPlay();
   </script>

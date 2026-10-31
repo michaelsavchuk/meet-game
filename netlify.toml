@@ -1,0 +1,7 @@
+# The solo game as a static site (see scripts/build-web.js).
+[build]
+  command = "npm run build:web"
+  publish = "dist/web"
+
+[build.environment]
+  NODE_VERSION = "22"

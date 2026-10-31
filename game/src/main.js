@@ -1,5 +1,5 @@
 import * as Phaser from '/vendor/phaser.js';
-import { connectBridge, isConnected, viaServer } from './bridge.js';
+import { connectBridge, isConnected, mode } from './bridge.js';
 import { connectRemote } from './remote.js';
 import { startBots, addBot, removeBots, botLevels } from './bots.js';
 import { WIDTH, HEIGHT, FONT_FAMILY, DISPLAY_FONT, TEST_STRING, DEV_EVENTS, DIFFICULTIES } from './config.js';
@@ -31,7 +31,7 @@ const game = new Phaser.Game({
 
 connectBridge(game);
 connectRemote(game, () => ({
-  viaServer, devEvents: DEV_EVENTS, connected: isConnected(), cpus: botLevels(),
+  mode, devEvents: DEV_EVENTS, connected: isConnected(), cpus: botLevels(),
   difficulty: coopDifficulty(), difficulties: DIFFICULTIES.map((d) => d.label),
   background: backgroundChoice(), backgrounds: BATTLE, currentBackground: currentBackground(),
 }), {

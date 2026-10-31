@@ -8,7 +8,8 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "vendor": "cp node_modules/phaser/dist/phaser.esm.min.js game/vendor/phaser.js && mkdir -p game/vendor/emoji-picker && cp node_modules/emoji-picker-element/index.js node_modules/emoji-picker-element/picker.js node_modules/emoji-picker-element/database.js node_modules/emoji-picker-element/LICENSE node_modules/emoji-picker-element-data/en/emojibase/data.json game/vendor/emoji-picker/ && cp node_modules/emoji-picker-element-data/LICENSE game/vendor/emoji-picker/LICENSE-data",
-    "package": "mkdir -p dist && rm -f dist/meet-game.zip && cd game && zip -r ../dist/meet-game.zip . -x '.*' 'play.html' 'solo.html' 'src/solo.js' 'vendor/emoji-picker/*'"
+    "package": "mkdir -p dist && rm -f dist/meet-game.zip && cd game && zip -r ../dist/meet-game.zip . -x '.*' 'play.html' 'solo.html' 'src/solo.js' 'vendor/emoji-picker/*'",
+    "build:web": "node scripts/build-web.js"
   },
   "devDependencies": {
     "emoji-picker-element": "^1.29.1",

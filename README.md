@@ -72,7 +72,9 @@ The page uses only relative URLs, so it works at any host or port. Share the loc
 
 ### Solo
 http://localhost:8787/solo puts everything on one page: the game on the left, and the play and control pages as tabs on
-the right. Add CPUs and start from the Control tab, and type as yourself from the Play tab.
+the right. Add CPUs and start from the Control tab, and type as yourself from the Play tab. It runs entirely in the
+browser (no server involved), so it can also be deployed as a static site: `npm run build:web` writes `dist/web/`, which
+any static host can serve. On Netlify, connect the repo and `netlify.toml` takes care of the build.
 
 ## Game events
 Scenes subscribe on `this.game.events`:
