@@ -18,7 +18,10 @@ dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /even
   (`chat-message` / `meet-reaction`) with `chrome.runtime.sendMessage`, which reaches the game page directly.
 - `game/extension/background.js` only handles the toolbar button: it opens the game in a tab next to the current one
   and the control page in the side panel (`chrome.sidePanel`, global so it stays open across tabs), or in a tab where
-  the browser has no sidePanel API. `sidePanel.open()` must run before any `await` (user gesture).
+  the browser has no sidePanel API (Firefox uses `sidebar_action` / `browser.sidebarAction` instead). `sidePanel.open()`
+  must run before any `await` (user gesture). The manifest lists both `background.service_worker` (Chrome) and
+  `background.scripts` (Firefox event page); each browser uses its own. Firefox can only share windows in Meet and
+  stops drawing background tabs, so there the game opens in its own popup window instead of a tab.
 - `game/src/events.js` normalizes raw payloads into game events
   (`{ type: 'chat' | 'reaction', player: { id, name }, text | emoji, at }`); shared by the bridge and the server.
 - `game/src/bridge.js` picks its transport: as an extension page (`chrome.runtime.id` set) it listens to
