@@ -13,7 +13,7 @@ import {
 } from '../config.js';
 
 const LOG_LINES = 30;   // shown on the control page
-const KO_FRAMES = { frameWidth: 128, frameHeight: 256 };   // assets/ko.png: a strip of 6 flame-burst frames
+const KO_FRAME = { width: 256, height: 512 };   // assets/ko.svg (made by art/ko.mjs): a strip of burst frames, shown 1:1
 const MISS_COLORS = { 'so close!': '#ffd84d', '❌': '#ffffff' };
 // Banners (the 3-2-1 countdown, "Type to Fight!", "Sudden death!", the winner): big text on a slanted dark blue bar across the screen. The bar
 // cuts in and out with no fades, with a small screen shake as it appears; its letters fly up into it one after another,
@@ -34,6 +34,16 @@ const CONFETTI_EVERY = 60;        // ms between pieces after that, until back in
 const ENTER_STAGGER = 600;        // ms; fighters start running in within this, and all arrive as the countdown ends
 const ENTER_SLACK = 150;          // ms before "Type to Fight!" by which everyone has arrived
 
+// The burst where a knocked-out character leaves the screen (Character.blast): a few rapid loops, then gone. The SVG
+// loads as one image at its own size, so its frames are cut out here.
+export function koAnimation(scene) {
+  if (scene.anims.exists('ko')) return;
+  const texture = scene.textures.get('ko');
+  const count = Math.round(texture.source[0].width / KO_FRAME.width);
+  for (let i = 0; i < count; i++) texture.add(i, 0, i * KO_FRAME.width, 0, KO_FRAME.width, KO_FRAME.height);
+  scene.anims.create({ key: 'ko', frames: scene.anims.generateFrameNumbers('ko'), frameRate: 30, repeat: 2 });
+}
+
 // Phase 2: everyone runs in during a countdown, then gets a word. Typing another player's word sends your character
 // to attack them.
 // Last one standing wins (phase 3: the winner banner, then back to the lobby).
@@ -44,13 +54,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.spritesheet('ko', '/assets/ko.png', KO_FRAMES);
+    this.load.svg('ko', '/assets/ko.svg');
     if (!this.textures.exists('arena')) this.load.image('arena', '/assets/arena.png');
   }
 
   create() {
-    // The burst where a knocked-out character leaves the screen (Character.blast): a few rapid loops, then gone.
-    if (!this.anims.exists('ko')) this.anims.create({ key: 'ko', frames: this.anims.generateFrameNumbers('ko'), frameRate: 30, repeat: 2 });
+    koAnimation(this);
     this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
     this.fighting = false;   // false during the countdown: no words, no attacks
     this.over = false;

@@ -21,8 +21,7 @@ const GROW_TIME = 500;        // ms to reach FLING_SCALE
 const FLING_DISTANCE = 1600;  // px; far enough to leave the screen from anywhere
 const FLING_SCALE = 2.5;
 const FLING_SPINS = 3;
-const BLAST_SCALE = 2;        // the KO burst frames are 128×256 at scale 1
-const BLAST_INSET = 64 * BLAST_SCALE;   // keep the burst at least this far from a corner
+const BLAST_INSET = 128;      // keep the KO burst (256 wide) at least this far from a corner
 // A soft blue blob under the feet, like the arena's blue AO; it shrinks and fades as the figure leaves the ground.
 const SHADOW_COLOR = '20, 30, 110';   // r, g, b
 const SHADOW_ALPHA = 0.55;
@@ -573,7 +572,7 @@ export class Character extends Phaser.GameObjects.Container {
     });
   }
 
-  // The 'ko' flame burst (loaded by BattleScene) on the screen edge we just left, its base on the edge and its
+  // The 'ko' burst (loaded by BattleScene) on the screen edge we just left, its base on the edge and its
   // tip pointing back into the arena.
   blast() {
     const x = Phaser.Math.Clamp(this.x, BLAST_INSET, WIDTH - BLAST_INSET);
@@ -583,7 +582,7 @@ export class Character extends Phaser.GameObjects.Container {
       : this.x >= WIDTH ? [WIDTH, y, -90]
       : this.y <= 0 ? [x, 0, 180]
       : [x, HEIGHT, 0];
-    this.scene.add.sprite(bx, by, 'ko').setOrigin(0.5, 1).setAngle(angle).setScale(BLAST_SCALE).setDepth(20000)
+    this.scene.add.sprite(bx, by, 'ko').setOrigin(0.5, 1).setAngle(angle).setDepth(20000)
       .play('ko').once('animationcomplete', (_anim, _frame, sprite) => sprite.destroy());
   }
 

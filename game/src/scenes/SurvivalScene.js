@@ -4,7 +4,7 @@ import { roster } from '../roster.js';
 import { EnemyBrain } from '../bots.js';
 import { Character, spreadSpots } from '../objects/Character.js';
 import { FloorText } from '../objects/FloorText.js';
-import { BattleScene, BANNER_MS } from './BattleScene.js';
+import { BattleScene, BANNER_MS, koAnimation } from './BattleScene.js';
 import {
   MAX_HP, WANDER_SPEED, COUNTDOWN, COUNTDOWN_STEP, DEV_EVENTS, ENEMY_EMOJI, ENEMY_TINT, ENEMY_RUSH, ENEMY_ENTER_SPEED, ENEMIES_PER_PLAYER, ROAM_AVOID_RADIUS,
   WAVE_BREAK, WAVE_HEAL, DIFFICULTIES, NORMAL, waveSpec,
@@ -42,7 +42,7 @@ export class SurvivalScene extends BattleScene {
   }
 
   create() {
-    if (!this.anims.exists('ko')) this.anims.create({ key: 'ko', frames: this.anims.generateFrameNumbers('ko'), frameRate: 30, repeat: 2 });
+    koAnimation(this);
     this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);
     this.fighting = false;
     this.over = false;
