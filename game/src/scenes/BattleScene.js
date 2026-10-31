@@ -577,8 +577,12 @@ export class BattleScene extends Phaser.Scene {
 
   // A burst of confetti, then a steady fall until the scene ends (back to the lobby).
   confetti() {
-    for (let i = 0; i < CONFETTI_BURST; i++) this.dropConfetti(Phaser.Math.Between(0, 1500));
+    this.confettiBurst();
     this.time.addEvent({ delay: CONFETTI_EVERY, loop: true, callback: () => this.dropConfetti() });
+  }
+
+  confettiBurst(pieces = CONFETTI_BURST) {
+    for (let i = 0; i < pieces; i++) this.dropConfetti(Phaser.Math.Between(0, 1500));
   }
 
   dropConfetti(delay = 0) {

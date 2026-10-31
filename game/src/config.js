@@ -82,7 +82,7 @@ export const ENEMY_RUSH = 800;          // ms until the next enemy while too few
 export const ENEMY_ENTER_SPEED = 420;   // px/s running in (players run in at ENTER_SPEED)
 export const ENEMIES_PER_PLAYER = 0.5;  // keep at least this many enemies per player on the floor (rounded up) mid-wave
 export const ROAM_AVOID_RADIUS = 220;   // roaming players and enemies steer away from each other within this
-export const WAVE_BREAK = 2500;         // ms between clearing a wave and the next one's banner
+export const WAVE_BREAK = 2500;         // ms between clearing a wave and the next one starting
 export const WAVE_HEAL = 1;             // HP every survivor gets back between waves
 
 // The host's co-op difficulty setting (the control page's slider; index into this, NORMAL by default). It applies from

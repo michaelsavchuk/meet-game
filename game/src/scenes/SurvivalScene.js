@@ -15,6 +15,7 @@ const LEVELS = ['easy', 'normal', 'hard'];   // bots.js LEVELS, easiest first
 const ENEMY_HEART = '💜';
 const ENTER_STAGGER = 600;   // ms; like BattleScene, players start running in within this and arrive as the countdown ends
 const ENTER_SLACK = 150;
+const WAVE_CONFETTI = 25;   // pieces when a wave is cleared
 const DIFFICULTY_KEY = 'coop-difficulty';   // localStorage, so the host's setting survives reloading the game page
 
 // The co-op difficulty setting (index into DIFFICULTIES), set from the control page; read at the start of each wave.
@@ -197,7 +198,8 @@ export class SurvivalScene extends BattleScene {
     this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, maxHp: MAX_HP, word: null, lastWord: null, out: false, revealTimer: null, parries: new Set() });
   }
 
-  // Announce the next wave; its enemies start running in once the banner's gone.
+  // Start the next wave. The first opens with "Type to survive!" and its enemies start running in once that's gone; later
+  // ones follow the "Wave N cleared!" banner after WAVE_BREAK, so their enemies come right away.
   startWave() {
     if (this.over) return;
     this.wave++;
@@ -220,9 +222,9 @@ export class SurvivalScene extends BattleScene {
     this.spec = waveSpec(this.wave, this.alive().length, DIFFICULTIES[difficulty]);
     this.toSpawn = this.spec.count;
     this.addLog(`🌊 Wave ${this.wave}: ${this.spec.count} enemies (${DIFFICULTIES[difficulty].label.toLowerCase()})`);
-    this.banner(`Wave ${this.wave}`);
+    if (this.wave === 1) this.banner('Type to survive!');
     this.updateFloorText();
-    this.scheduleSpawn(BANNER_MS);
+    this.scheduleSpawn(this.wave === 1 ? BANNER_MS : 0);
   }
 
   // The next enemy comes right away while there aren't enough on the floor for everyone to have someone to fight
@@ -266,6 +268,7 @@ export class SurvivalScene extends BattleScene {
     victim.character.knockOut(by.character.x, by.character.y, () => {
       this.cameras.main.shake(victim.enemy ? 250 : 450, victim.enemy ? 0.012 : 0.025);
       if (last) this.banner(`You made it to wave ${this.wave}!`, { color: '#ffd84d', persist: true, wave: true });
+      else if (!victim.enemy) this.banner(`💀 ${victim.name} is out!`, { animate: false });
     });
     this.cameras.main.shake(300, 0.015);
     if (victim.enemy) {
@@ -289,6 +292,7 @@ export class SurvivalScene extends BattleScene {
     if (this.enemies.some((e) => !e.out)) return;
     this.addLog(`✅ Wave ${this.wave} cleared`);
     this.banner(`Wave ${this.wave} cleared!`);
+    this.confettiBurst(WAVE_CONFETTI);
     this.time.delayedCall(WAVE_BREAK, () => this.startWave());
   }
 

@@ -92,12 +92,14 @@ Phases, one scene each (`game/src/scenes/`):
 **Co-op** (`SurvivalScene`, extends BattleScene through its hooks: `everyone()`, `foes()`, `carriesWord()`, `steer()`,
 `hit()`/`retype()`, `heartIcon()`): players have no words and fight waves of enemies together. `fighters` is still just
 the players (so hearts, bots and `alive()` work unchanged); enemies are in `enemies`. Each wave (`waveSpec()` in config.js:
-more enemies, more HP, and tougher levels as waves go on) is announced with the flash banner; its enemies (`ENEMY_EMOJI`,
+more enemies, more HP, and tougher levels as waves go on) starts after the last one's "Wave N cleared!" banner (the
+first opens with "Type to survive!"); its enemies (`ENEMY_EMOJI`,
 tinted purple by level with `setEmojiTint()`, 💜 HP, no name tag) run in from the stairs one by one through the wave and
 get a word once off the stairs. Enemies attack on their own via `EnemyBrain` (bots.js), which reuses CPU levels, timing and
 `pickTarget()`; players counter them like in a battle, and CPU players attack enemies (bots use `scene.foes(me)`). Roaming
 players and enemies steer away from each other (`ROAM_AVOID_RADIUS`). Clearing a wave heals survivors `WAVE_HEAL`, late
-joiners run in, and the next wave starts. When every player is out: "You made it to wave N!". No sudden death.
+joiners run in, and the next wave starts (with a burst of confetti, `confettiBurst()`). A player knocked out flashes
+"💀 [name] is out!" (a still banner like sudden death's). When every player is out: "You made it to wave N!". No sudden death.
 The control page's co-op difficulty slider (`DIFFICULTIES` in config.js, Normal by default) scales enemy count,
 toughness, HP and rest between attacks; it's a scene-independent `setDifficulty` command, kept in the game page's
 localStorage, and read at the start of each wave.
