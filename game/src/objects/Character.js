@@ -34,6 +34,14 @@ const HAND_X = 32;          // sword in front of the emoji, shield behind
 const SWORD_Y = 4;
 const SHIELD_Y = 8;
 const GRIP_FOLLOW = 18;     // how quickly the sword and shield catch up with the hop (higher = less lag)
+// The speech bubble leans against horizontal acceleration, pivoting on its tail: it trails behind when a character
+// sets off, swings ahead when it stops, and rights itself at a steady speed. Up to BUBBLE_LEAN degrees at
+// BUBBLE_LEAN_ACCEL px/s² across, easing there at BUBBLE_LEAN_FOLLOW. Velocity is smoothed by VX_FOLLOW first so
+// single-frame shoves don't jolt it.
+const BUBBLE_LEAN = 24;
+const BUBBLE_LEAN_ACCEL = 700;
+const BUBBLE_LEAN_FOLLOW = 6;
+const VX_FOLLOW = 8;
 // Noto draws 🗡️ blade down-left; this turns it mostly upright, tipped slightly forward (mirrored when facing right).
 const SWORD_ANGLE = 120;
 
@@ -150,6 +158,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.shield = scene.add.text(-HAND_X, SHIELD_Y, SHIELD, { fontSize: '34px' }).setOrigin(0.5).setVisible(false);
     this.figure = scene.add.container(0, 0, [this.emoji, this.sword, this.shield]);   // held items in front
     this.gripY = 0;   // where the sword and shield have caught up to in the hop (they trail it slightly)
+    this.leanVx = 0;  // smoothed horizontal px/s, whose change leans the bubble
     this.nameText = scene.add.text(0, 38, player.name, { fontSize: '16px', color: '#e8e8f0', fontStyle: 'bold' }).setOrigin(0.5, 0);
     this.hearts = scene.add.text(0, player.name ? 58 : 38, '', { fontSize: '14px' }).setOrigin(0.5, 0).setVisible(false);
     this.add([this.shadow, this.figure, this.nameText, this.hearts]);
@@ -266,6 +275,7 @@ export class Character extends Phaser.GameObjects.Container {
 
     // Measured since last frame so separate() shoves and knockbacks count too.
     if (!this.out && !this.airborne) this.hop(Math.hypot(this.x - this.lastPos.x, this.y - this.lastPos.y) / (dt || 1), dt);
+    this.leanBubble((this.x - this.lastPos.x) / (dt || 1), dt);
     this.lastPos = { x: this.x, y: this.y };
     if (!this.out) this.setDepth(this.y);   // lower on screen = in front
     this.updateShadow();
@@ -290,6 +300,16 @@ export class Character extends Phaser.GameObjects.Container {
     this.gripY = Phaser.Math.Linear(this.gripY, this.figure.y, Math.min(1, dt * GRIP_FOLLOW));
     this.setGripLag(this.gripY - this.figure.y);
     this.emoji.angle = this.shakeTween?.isPlaying() ? 0 : this.hopSide * this.hopTilt * lift;
+  }
+
+  // Tilt the bubble against horizontal acceleration, given this frame's `vx` (px/s), as if it trails behind. It
+  // pivots on its tail tip, which is the container's origin.
+  leanBubble(vx, dt) {
+    if (!dt) return;
+    const prev = this.leanVx;
+    this.leanVx = Phaser.Math.Linear(prev, vx, Math.min(1, dt * VX_FOLLOW));
+    const lean = -Phaser.Math.Clamp((this.leanVx - prev) / dt / BUBBLE_LEAN_ACCEL, -1, 1) * BUBBLE_LEAN;
+    this.bubble.angle = Phaser.Math.Linear(this.bubble.angle, lean, Math.min(1, dt * BUBBLE_LEAN_FOLLOW));
   }
 
   // Shrink and fade the shadow the higher the figure is off the ground.
