@@ -8,7 +8,7 @@ import { BattleScene } from './scenes/BattleScene.js';
 import { SurvivalScene, coopDifficulty, setCoopDifficulty } from './scenes/SurvivalScene.js';
 import { HowToScene } from './scenes/HowToScene.js';
 import { HudScene } from './scenes/HudScene.js';
-import { BATTLE, backgroundChoice, setBackgroundChoice, currentBackground } from './backgrounds.js';
+import { BATTLE, backgroundChoice, setBackgroundChoice, currentBackground, cycleBackground } from './backgrounds.js';
 
 // Every scene.add.text() defaults to FONT_FAMILY, so emoji render with Noto Color Emoji (see index.html), and
 // to TEST_STRING, so they aren't clipped.
@@ -39,6 +39,13 @@ connectRemote(game, () => ({
   setDifficulty: (value) => setCoopDifficulty(value),
   setBackground: (id) => setBackgroundChoice(id),
   removeCpus: () => removeBots(game),
+  B: () => nextBackground(),
 });
+// Dev: B swaps the showing scene's backdrop (works in every scene, so it's here rather than in the scenes' commands).
+function nextBackground() {
+  const scene = game.scene.getScenes(true).find((s) => s.background);
+  if (DEV_EVENTS && scene) cycleBackground(scene);
+}
+if (DEV_EVENTS) window.addEventListener('keydown', (e) => { if (e.code === 'KeyB' && !e.repeat) nextBackground(); });
 startBots(game);
 window.game = game;   // for poking at state from the dev console

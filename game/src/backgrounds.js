@@ -55,8 +55,18 @@ export function addBattleBackground(scene) {
   return add(scene, current);
 }
 
+// Dev: swaps the scene's backdrop for the next one (lobby's included), to compare them quickly. Doesn't change the
+// host's pick.
+export function cycleBackground(scene) {
+  const ids = [LOBBY, ...BATTLE.map((b) => b.id)];
+  const id = ids[(ids.indexOf(scene.background.texture.key.slice(3)) + 1) % ids.length];
+  scene.background.setTexture(key(id));
+  if (scene.scene.key !== 'lobby') current = id;   // so the control page names what's showing
+}
+
 function add(scene, id) {
-  return scene.add.image(0, 0, key(id)).setOrigin(0).setDepth(-1000);
+  scene.background = scene.add.image(0, 0, key(id)).setOrigin(0).setDepth(-1000);
+  return scene.background;
 }
 
 function key(id) {

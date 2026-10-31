@@ -118,6 +118,4 @@ export function waveSpec(n, players, setting = DIFFICULTIES[NORMAL]) {
 
 export const CHAT_BUBBLE_MS = 4000; // how long lobby chat stays above a character
 
-// Dev fake events: the game page's dev keys and the control page's "fake events" buttons (see the scenes' `commands`).
-// CPU players don't depend on this.
-export const DEV_EVENTS = false;
+export { DEV_EVENTS } from './dev.js'; // on only under `npm run dev`

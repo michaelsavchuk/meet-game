@@ -12,6 +12,7 @@ import path from 'node:path';
 import { normalize } from '../game/src/events.js';
 
 const PORT = process.env.PORT || 8787;
+const DEV = process.argv.includes('--dev');   // `npm run dev`: turns on the game's dev keys and buttons (game/src/dev.js)
 const ROOT = path.join(import.meta.dirname, '..', 'game');
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.json': 'application/json', '.ttf': 'font/ttf' };
 const ROUTES = { '/messages': normalize['chat-message'], '/reactions': normalize['meet-reaction'] };
@@ -37,6 +38,10 @@ setInterval(() => { for (const res of clients) res.write(': ping\n\n'); }, 25000
 // ---- Static files ----
 function serveStatic(req, res) {
   const url = decodeURIComponent(req.url.split('?')[0]);
+  if (DEV && url === '/src/dev.js') {
+    res.setHeader('Content-Type', 'text/javascript');
+    return res.end('export const DEV_EVENTS = true;\n');
+  }
   let file = path.join(ROOT, url.slice(1) || 'index.html');
   if (!path.extname(file)) file += '.html';   // /control -> control.html
   if (!file.startsWith(ROOT + path.sep)) { res.statusCode = 403; return res.end(); }
@@ -73,4 +78,4 @@ http.createServer((req, res) => {
     res.statusCode = 404;
     res.end();
   }
-}).listen(PORT, () => console.log(`Game server on http://localhost:${PORT}`));
+}).listen(PORT, () => console.log(`Game server on http://localhost:${PORT}${DEV ? ' (dev keys on)' : ''}`));

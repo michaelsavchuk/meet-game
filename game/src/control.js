@@ -8,6 +8,7 @@ const DEV = {
   battle: [['C', 'Fake attack'], ['X', 'Fake chatter'], ['T', 'Fake typo'], ['P', 'Fake counter'], ['R', 'Fake reaction'], ['H', 'Drop a heart'], ['G', 'Fake heart grab']],
   survival: [['C', 'Fake attack'], ['T', 'Fake typo'], ['P', 'Fake counter'], ['R', 'Fake reaction'], ['H', 'Drop a heart'], ['G', 'Fake heart grab'], ['E', 'Spawn an enemy']],
 };
+const DEV_ANY = [['B', 'Next background']];   // in every phase
 
 const $ = (id) => document.getElementById(id);
 const channel = new BroadcastChannel(CHANNEL);
@@ -61,7 +62,7 @@ function render(state) {
   button('end').hidden = lobby;
   button('end').textContent = state.over ? 'Back to lobby' : 'End round';
   $('log-section').hidden = lobby;
-  $('dev-section').hidden = !state.devEvents;   // DEV_EVENTS in config.js
+  $('dev-section').hidden = !state.devEvents;   // DEV_EVENTS, on under `npm run dev`
   renderDev(state.phase);
   cpus = state.cpus ?? {};
   const nCpus = Object.keys(cpus).length;
@@ -184,7 +185,7 @@ function fighterState(f) {
 function renderDev(phase) {
   if (phase === devPhase) return;
   devPhase = phase;
-  $('dev').replaceChildren(...(DEV[phase] ?? []).map(([key, label]) => {
+  $('dev').replaceChildren(...[...(DEV[phase] ?? []), ...DEV_ANY].map(([key, label]) => {
     const b = document.createElement('button');
     b.className = 'secondary';
     b.append(Object.assign(document.createElement('kbd'), { textContent: key }), label);

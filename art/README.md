@@ -32,7 +32,8 @@ lowercase name) so code can find them all.
     anything in front of the floor that rises above about 1 m covers the floor in the picture.
 - **`<Name>`** (for example `Forest`): everything that background's camera sees.
 - **`<Name> Pack`**: the pack's models, out of view at x ≥ 14. Objects are named `<pack>-<model>` (for example
-  `forest-tree`). Each pack has one packed texture (`<pack>-colormap.png`) and one material (`<pack>-colormap`) that
+  `forest-tree`). Some placed decor also lives here, moved into view (the arena's columns and bricks, the forest's
+  camp props), so a background is everything in view from both collections. Each pack has one packed texture (`<pack>-colormap.png`) and one material (`<pack>-colormap`) that
   runs through the shared `Toon Style` node (see "Look"), so every background is shaded alike.
 - The world (dark backdrop) and render settings are the same in all scenes.
 
@@ -66,42 +67,41 @@ The entrances in the new backgrounds are flat hallways/trails rather than stairs
   symmetric, so one piece fits all eight spots by turning it (0 when its square points toward +x/+y, π/2 for −x/+y,
   −π/2 for +x/−y, π for −x/−y). The room wall next to it is scaled to 0.4 m, and a floor tile under it
   (`door-floor`) carries the checker into the rounded-off part.
-- **Outside**: `outside-cap`, one flat mesh at ground level filling everything outside the room and hallways (a big
-  square with the floor and the four entrance lanes cut out). It uses `arcade-colormap` with every UV on the wall
-  tops' texel, so it's exactly the wall-top color and gets the same AO. At ground level the walls still stand up from
-  it with their rounded corners; level with the wall tops it merged them into one slab.
-- **Decor**: machines along the back and side walls, facing in; air hockey and the prize counter in the front
-  corners, since the front wall hides anything placed against it. Keep the floor's middle clear.
+  Four of the `door-corner` pieces are single-user copies (`arcade-wall-corner-outer.001` etc.), tweaked on their own.
+- **Outside**: nothing; the world's dark backdrop shows around the room and hallways.
+- **Decor**: none, so the floor reads clearly behind the lobby's floor text and characters.
 
 ### Arena
 - **Floor**: `arena-floor`, with some `arena-floor-detail` away from the middle.
 - **Border**: a ring of the pack's low `stairs` (0.5 m) climbing away from the floor, with `stairs-corner-inner` at
   the corners (it matches the straight runs on both of its sides; unturned, its low corner points to +x/−y).
-- **Outside**: raised ground of `arena-block` (`ground`), level with the top step, filling the rest of the frame,
-  with some `arena-floor-detail` on top.
+- **Outside**: raised ground, level with the top step, filling the rest of the frame: six large scaled blocks
+  (`ground`), one either side of each side path and two either side of the back path.
 - **Entrances**: flat paths cut through the stairs and raised ground, lined on both sides with `border-straight`
   (`path-edge`) as low walls.
-- **Decor** (kept sparse): six columns and two broken ones along the rim, statues in the back corners, a banner
-  either side of the back path, and eight trees further out.
+- **Decor** (kept sparse): a row of columns along the back rim and a few down the sides, some broken
+  (`column-damaged`), with brick piles (`bricks`) between them; these are in `Arena Pack`, placed at z 0.5 on the raised
+  ground. A banner either side of the back path, and trees (`arena-tree`) at the frame's corners.
 
 ### Forest
-- **Clearing**: `ground`, one large plane with the `forest-grass` material: a noise texture through a two-green
-  constant ramp, darker outside the floor rectangle with a wavy edge, into `Toon Style`.
-- **Forest floor**: the pack's grass tiles on every cell of the border band and beyond, except the trails: mostly flat
-  `patch-grass` (`ground-grass`), some raised `platform` (`ground-platform`).
-- **Trees**: `tree` and `tree-high`, randomly turned and sized, standing on the tiles, trunks kept off the floor and out
+- **Clearing**: `Circle` (in `Forest Pack`), one large flat disc (about 18×19.5 m) at the origin using
+  `forest-colormap`, so its green comes from the pack's texture and the `Distance Fade` darkens it toward the edges.
+  The old `forest-grass` material (noise through a two-green ramp) is no longer used by anything.
+- **Forest floor**: the same disc runs under the trees; the old grass tiles are gone except one raised `platform`
+  (`ground-platform`).
+- **Trees**: `tree` and `tree-high` (about 190), randomly turned and sized, standing on the disc, trunks kept off the floor and out
   of the entrance lanes. Trees in front of the floor are scaled down so their tops stay just below the floor's front
   edge in the picture (about where the dungeon's front wall is), and the ones on the camera's side of the side
-  trails are kept small so the trail shows. Plants line the forest's edge; a few plants and dirt patches sit near the
-  clearing's edges.
-- **Trails** (the only rock): a `rocks-ramp` at the forest's edge climbing to `rocks-low` tiles with `patch-grass` on
+  trails are kept small so the trail shows. One plant and two dirt patches sit near the clearing's edges.
+- **Trails**: a `rocks-ramp` at the forest's edge climbing to `rocks-low` tiles with `patch-grass` on
   top, running off screen.
-- **Distance fade**: the `Distance Fade` node group sits between the color and `Toon Style` in `forest-colormap` and
-  `forest-grass`. It blends the color toward `Tint` (the AO tint at a quarter brightness) by how far the surface is
-  outside the floor rectangle in world space, so the forest darkens away from the clearing: no fade at `Start`
-  (0.2 m), `Amount` (0.9) by `End` (1.5 m). The range is short because tree tops lean outward on screen, so the
-  canopy at the frame's edges is only about 1–1.5 m out. Each material has its own node, so set both the same. Add
-  the group to another material the same way to use it elsewhere.
+- **Camp decor** (in `Forest Pack`): a tent and fences back-left, an archery range (three targets and a flag)
+  back-right and right, stones and a fence in the front corners, and two half-buried `Sphere` mounds.
+- **Distance fade**: the `Distance Fade` node group sits between the color and `Toon Style` in `forest-colormap`. It
+  blends the color toward `Tint` (the AO tint at a quarter brightness) by how far the surface is outside the floor
+  rectangle in world space, so the forest darkens away from the clearing. It's set to `Start` −1.4 m (so the fade
+  begins inside the floor, shading the clearing's edges), `End` 6.1 m and `Amount` 3.1. Add the group to another
+  material the same way to use it elsewhere.
 
 ### Dungeon
 The original arena, built before the others. These notes go into more detail.

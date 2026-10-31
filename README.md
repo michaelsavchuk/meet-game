@@ -56,11 +56,12 @@ random one each round, or pick one with the control page's **Background** dropdo
 
 **CPU players**: pick a level (Easy, Normal, Hard or Mixed) and click **Add CPU** on the control page. CPUs join
 by chatting and play by typing words at their own speed, with typos, counters and heart grabs, so you can play with fewer people.
-With `DEV_EVENTS = true` in `game/src/config.js`, dev buttons on the control page (or keys on the game page) send fake events: **C** fake join
-(lobby) or attack (battle), **X** fake non-word chat, **T** fake typo, **P** fake counter, **R** fake reaction.
+Under `npm run dev` (see Dev server), dev buttons on the control page (or keys on the game page) send fake events: **C** fake join
+(lobby) or attack (battle), **X** fake non-word chat, **T** fake typo, **P** fake counter, **R** fake reaction, and
+**B** swaps the backdrop on screen for the next one, to compare backgrounds.
 
 ## Dev server
-`npm install`, then `npm start` (or `npm run dev` to restart on server changes) serves the same game at
+`npm install`, then `npm start` (or `npm run dev` to restart on server changes and turn on the dev keys) serves the same game at
 http://localhost:8787 and the control page at http://localhost:8787/control, so you can work on the game without
 reloading the extension. Events come from the dev keys, `curl`, or the play page instead of Meet.
 

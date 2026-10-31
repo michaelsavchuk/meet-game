@@ -149,7 +149,7 @@ other tuning; animation tuning lives at the top of Character.js).
 - Emoji use Google's Noto Color Emoji (`game/fonts/Noto-COLRv1.ttf`, `@font-face` in `index.html`). `main.js` makes
   `FONT_FAMILY` the default for every `scene.add.text()` and loads the font before the game starts.
 - Game features must work in all three modes (extension, dev server, solo/static), so they talk only through
-  bridge.js and `remote.js` and never need the server: nothing beyond the event relay belongs in `server/`.
+  bridge.js and `remote.js` and never need the server: nothing beyond the event relay (and `--dev` switching on `src/dev.js`) belongs in `server/`.
 - Commit directly to `main`; no feature branches for now.
 
 ## Running and testing
@@ -161,7 +161,10 @@ other tuning; animation tuning lives at the top of Character.js).
   `python3 -m http.server -d dist/web`.
 - Dev server: `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787, control page at
   http://localhost:8787/control in another tab of the same browser. `PORT=… npm start` uses another port.
-- Dev keys on the game page, also buttons on the control page, when `DEV_EVENTS` is true in `config.js` (default false; fake events take the same path as real ones): lobby **C** = a fake player joins,
+- Dev keys on the game page, also buttons on the control page, only under `npm run dev`: `DEV_EVENTS` (`src/dev.js`,
+  re-exported by `config.js`) is false, and the dev server started with `--dev` serves that module with `true` instead,
+  so the extension, `npm start` and the static site never have them (fake events take the same path as real ones).
+  Any scene **B** = swap the backdrop on screen for the next one (`cycleBackground()`, doesn't change the host's pick); lobby **C** = a fake player joins,
   **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat,
   **T** = a typo of someone's word, **P** = a chased fighter counters their chaser,
   **H** = drop a heart now, **G** = a random fighter goes for the heart; co-op **C**/**T**/**P**/**R**/**H**/**G** likewise
