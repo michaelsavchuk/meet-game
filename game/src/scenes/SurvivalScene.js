@@ -4,6 +4,7 @@ import { roster } from '../roster.js';
 import { EnemyBrain } from '../bots.js';
 import { Character, spreadSpots } from '../objects/Character.js';
 import { FloorText } from '../objects/FloorText.js';
+import { addBattleBackground } from '../backgrounds.js';
 import { BattleScene, BANNER_MS, koAnimation } from './BattleScene.js';
 import {
   MAX_HP, WANDER_SPEED, COUNTDOWN, COUNTDOWN_STEP, DEV_EVENTS, ENEMY_EMOJI, ENEMY_TINT, ENEMY_RUSH, ENEMY_ENTER_SPEED, ENEMIES_PER_PLAYER, ROAM_AVOID_RADIUS,
@@ -43,7 +44,7 @@ export class SurvivalScene extends BattleScene {
 
   create() {
     koAnimation(this);
-    this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);
+    addBattleBackground(this);
     this.fighting = false;
     this.over = false;
     this.log = [];

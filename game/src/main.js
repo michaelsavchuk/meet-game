@@ -7,6 +7,7 @@ import { LobbyScene } from './scenes/LobbyScene.js';
 import { BattleScene } from './scenes/BattleScene.js';
 import { SurvivalScene, coopDifficulty, setCoopDifficulty } from './scenes/SurvivalScene.js';
 import { HudScene } from './scenes/HudScene.js';
+import { BATTLE, backgroundChoice, setBackgroundChoice, currentBackground } from './backgrounds.js';
 
 // Every scene.add.text() defaults to FONT_FAMILY, so emoji render with Noto Color Emoji (see index.html), and
 // to TEST_STRING, so they aren't clipped.
@@ -31,9 +32,11 @@ connectBridge(game);
 connectRemote(game, () => ({
   viaServer, devEvents: DEV_EVENTS, connected: isConnected(), cpus: botLevels(),
   difficulty: coopDifficulty(), difficulties: DIFFICULTIES.map((d) => d.label),
+  background: backgroundChoice(), backgrounds: BATTLE, currentBackground: currentBackground(),
 }), {
   addCpu: (level) => addBot(level),
   setDifficulty: (value) => setCoopDifficulty(value),
+  setBackground: (id) => setBackgroundChoice(id),
   removeCpus: () => removeBots(game),
 });
 startBots(game);

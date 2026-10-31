@@ -1,15 +1,111 @@
-# Arena background (`arena.blend`)
+# Arena backgrounds (`arena.blend`)
 
-Blender 5.2 scene that renders the battle arena backdrop: a walled dungeon room seen from above, built
-from Kenney's **Mini Dungeon** pack (CC0). Rendering (F12, then Image → Save, or
-`bpy.ops.render.render(write_still=True)`) writes `//../game/assets/arena.png`, a 1280×720 image that matches the game canvas.
-Textures are packed into the .blend, so it doesn't need the original download.
+Blender 5.2 file that renders the arena backdrops: one **scene per background**, all seen through the same camera
+and sharing the same floor, border and entrances, so `ARENA` and `STAIRS` in `game/src/config.js` fit every one.
+They're purely visual: switching backgrounds is just loading a different PNG. All packs are Kenney's (CC0), and their
+textures are packed into the .blend, so it doesn't need the original downloads.
 
-The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. Prefer the Python API through
-`execute_blender_code` for bulk changes (150 tiles, 31 materials).
+| Scene | Pack | Output (1280×720, the game canvas) | In the game |
+|---|---|---|---|
+| `Dungeon` | Mini Dungeon | `game/assets/bg-dungeon.png` | Battle/co-op (the original arena) |
+| `Arcade` | Mini Arcade | `game/assets/bg-arcade.png` | Lobby |
+| `Arena` | Mini Arena | `game/assets/bg-arena.png` | Battle/co-op |
+| `Forest` | Mini Forest | `game/assets/bg-forest.png` | Battle/co-op |
 
-## Scene layout
-- **`Arena` collection**: everything the camera sees. 232 **linked duplicates** (they share mesh data with the pack
+The game picks among the battle ones (`game/src/backgrounds.js`; the host chooses on the control page, Random by
+default). Re-rendering over an output updates the game; a new background also needs adding to `BATTLE` there.
+Switch scenes with the scene selector at the top right of
+Blender. Render the active scene with F12, then Image → Save As over its output file (Output Properties → Output
+shows the path), or `bpy.ops.render.render(write_still=True)`, which writes it directly. Save the .blend afterward.
+The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file; prefer the Python API through
+`execute_blender_code` for bulk changes. Each background scene also carries a `background` custom property (its
+lowercase name) so code can find them all.
+
+## How the file is organized
+- **`Shared` collection**, linked into every scene (same objects, not copies):
+  - `Camera` and `Light`. Moving the camera moves it for every background; then re-measure `ARENA` and `STAIRS`
+    (see "Fitting the game").
+  - Wireframe `Guide *` objects (not rendered, not selectable; show/hide them in the outliner): `Guide Floor` is the
+    play floor (x ±6.5, y ±4, 13×8 one-meter cells centered on the origin), `Guide Walls` the 1 m border band
+    around it, and `Guide Entry *` the four entrance lanes (back/front 1 m wide at x 0, left/right 2 m wide at y 0).
+    Keep every background's floor, border and entrances on these lines, and keep tall things off the front border:
+    anything in front of the floor that rises above about 1 m covers the floor in the picture.
+- **`<Name>`** (for example `Forest`): everything that background's camera sees.
+- **`<Name> Pack`**: the pack's models, out of view at x ≥ 14. Objects are named `<pack>-<model>` (for example
+  `forest-tree`). Each pack has one packed texture (`<pack>-colormap.png`) and one material (`<pack>-colormap`) that
+  runs through the shared `Toon Style` node (see "Look"), so every background is shaded alike.
+- The world (dark backdrop) and render settings are the same in all scenes.
+
+**Editing a layout by hand**
+- Objects in the scenes are **linked duplicates** of the pack models: they share mesh data. Add pieces by selecting
+  one (in the scene or in `<Name> Pack`), **Alt+D**, and moving it into the scene's collection (**M**). Don't edit a
+  placed piece's mesh in Edit Mode unless you mean to change every copy; to change just one, make it single-user
+  first (**U → Object & Data**).
+- Pack objects keep the FBX import's `rotation_euler.x = 90°` and `scale = 0.01`; copies made from them keep it too.
+  Turn pieces with `rotation_euler.z` only. Kenney models put their front (a wall's trim, a cabinet's screen) on
+  local −Y, so the turn that faces the floor from each side is back 0, front π, left π/2, right −π/2.
+- Most pieces sit on whole- or half-meter positions; Increment snapping helps.
+- The FBX animations were removed when the packs were imported; a pack model with an animation would ignore any
+  pose you set on a copy (that's how the arcade's doors were found out).
+
+## Backgrounds
+The entrances in the new backgrounds are flat hallways/trails rather than stairs, but characters still run in along
+`STAIRS`, whose off-screen ends are 1.8 m up. Against the shared camera that path stays inside each entrance lane.
+
+### Arcade (lobby)
+- **Floor**: `arcade-floor` tiles (a 2×2 checker each), continuing through each doorway and down its hallway.
+- **Walls**: plain `arcade-wall` (0.6 m thick, trim facing in) on lines 0.3 m outside the floor, so their inner
+  faces sit on the floor's edge. Corners use the pack's `wall-corner`; its arms reach 0.2 m past the floor's edge,
+  so the straight piece next to each corner is scaled to 0.8 m long to meet it without overlapping faces (which
+  would flicker).
+- **Entrances**: an open doorway on each side, no doors (characters are drawn over the background, so they'd seem to
+  walk through them), each leading into a hallway walled on both sides with the trim facing in, running off screen.
+  Where a room wall turns into a hallway wall is **`arcade-wall-corner-outer`** (`door-corner` objects), a custom
+  piece in `Arcade Pack`: a straight wall bent a quarter turn so the trim curves round the outside of the bend,
+  rounded like the pack's own corners. It fills a 0.6 m square with its origin at the doorway's corner and is
+  symmetric, so one piece fits all eight spots by turning it (0 when its square points toward +x/+y, π/2 for −x/+y,
+  −π/2 for +x/−y, π for −x/−y). The room wall next to it is scaled to 0.4 m, and a floor tile under it
+  (`door-floor`) carries the checker into the rounded-off part.
+- **Outside**: `outside-cap`, one flat mesh at ground level filling everything outside the room and hallways (a big
+  square with the floor and the four entrance lanes cut out). It uses `arcade-colormap` with every UV on the wall
+  tops' texel, so it's exactly the wall-top color and gets the same AO. At ground level the walls still stand up from
+  it with their rounded corners; level with the wall tops it merged them into one slab.
+- **Decor**: machines along the back and side walls, facing in; air hockey and the prize counter in the front
+  corners, since the front wall hides anything placed against it. Keep the floor's middle clear.
+
+### Arena
+- **Floor**: `arena-floor`, with some `arena-floor-detail` away from the middle.
+- **Border**: a ring of the pack's low `stairs` (0.5 m) climbing away from the floor, with `stairs-corner-inner` at
+  the corners (it matches the straight runs on both of its sides; unturned, its low corner points to +x/−y).
+- **Outside**: raised ground of `arena-block` (`ground`), level with the top step, filling the rest of the frame,
+  with some `arena-floor-detail` on top.
+- **Entrances**: flat paths cut through the stairs and raised ground, lined on both sides with `border-straight`
+  (`path-edge`) as low walls.
+- **Decor** (kept sparse): six columns and two broken ones along the rim, statues in the back corners, a banner
+  either side of the back path, and eight trees further out.
+
+### Forest
+- **Clearing**: `ground`, one large plane with the `forest-grass` material: a noise texture through a two-green
+  constant ramp, darker outside the floor rectangle with a wavy edge, into `Toon Style`.
+- **Forest floor**: the pack's grass tiles on every cell of the border band and beyond, except the trails: mostly flat
+  `patch-grass` (`ground-grass`), some raised `platform` (`ground-platform`).
+- **Trees**: `tree` and `tree-high`, randomly turned and sized, standing on the tiles, trunks kept off the floor and out
+  of the entrance lanes. Trees in front of the floor are scaled down so their tops stay just below the floor's front
+  edge in the picture (about where the dungeon's front wall is), and the ones on the camera's side of the side
+  trails are kept small so the trail shows. Plants line the forest's edge; a few plants and dirt patches sit near the
+  clearing's edges.
+- **Trails** (the only rock): a `rocks-ramp` at the forest's edge climbing to `rocks-low` tiles with `patch-grass` on
+  top, running off screen.
+- **Distance fade**: the `Distance Fade` node group sits between the color and `Toon Style` in `forest-colormap` and
+  `forest-grass`. It blends the color toward `Tint` (the AO tint at a quarter brightness) by how far the surface is
+  outside the floor rectangle in world space, so the forest darkens away from the clearing: no fade at `Start`
+  (0.2 m), `Amount` (0.9) by `End` (1.5 m). The range is short because tree tops lean outward on screen, so the
+  canopy at the frame's edges is only about 1–1.5 m out. Each material has its own node, so set both the same. Add
+  the group to another material the same way to use it elsewhere.
+
+### Dungeon
+The original arena, built before the others. These notes go into more detail.
+- **`Dungeon` collection**: everything the camera sees (it was called `Arena` before the other backgrounds). 232 **linked duplicates** (they share mesh data with the pack
   originals, so editing an original's mesh or material updates every copy):
   - Floor: 13×8 grid of 1 m tiles centered on the origin (x −6..6, y −3.5..3.5). About 15% are `floor-detail`,
     chosen with `random.Random(7)` so a rebuild comes out the same. Then the three that sat under the game's floor text
@@ -17,7 +113,7 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
     screen y 320–470 free of `floor-detail` if you rebuild.
   - Walls: a ring at x = ±7, y = ±4.5. Straight runs use `wall-half` (trim on its local −Y face), turned with
     `rotation_euler.z` so the trim faces the floor: back 0, front π, left π/2, right −π/2. Corners use
-    `wall-corner`, a custom asset (in `Collection`): a `dirt` block with the pack's `column` scaled to
+    `wall-corner`, a custom asset (in `Dungeon Pack`): a `dirt` block with the pack's `column` scaled to
     0.3×0.3×1.0 m in its −X/−Y corner. Each corner is turned so the pillar sits at the floor's inner corner:
     back-right 0, back-left π/2, front-left π, front-right −π/2.
     To revert to the original full `wall` corners, run this for each corner object: `o.data = bpy.data.meshes[o['orig_mesh']]`,
@@ -37,13 +133,26 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
     `dirt-fill` copies added when the camera moved back. They're placed only where a tile is in view, so no world
     background shows in the render. Re-run that placement if the camera moves: for each 1 m cell outside the walls
     (integer x, half-integer y), add a `dirt` copy at z 0 if any corner at z 0 or 0.9 projects into the frame and no
-    Arena object is already within 0.6 m.
+    Dungeon object is already within 0.6 m.
   - All pack objects carry `rotation_euler.x = 90°` and `scale = 0.01` from the FBX import. Keep that when
     placing new copies.
-- **`Collection`**: the original pack assets (props, characters, weapons, every wall/floor variant), laid out in a
-  grid at x ≥ 14, outside the camera's view. Copy from here (`obj.copy()` + link to `Arena`) to add props.
+- **`Dungeon Pack`**: the original pack assets (props, characters, weapons, every wall/floor variant), laid out in a
+  grid at x ≥ 14, outside the camera's view. Copy from here (`obj.copy()` + link to `Dungeon`) to add props.
 
-## Camera and light
+## Adding a background
+1. Download and unzip the Kenney pack.
+2. From the Dungeon scene, make a new scene with **New Scene → Linked Copy** (keeps the render and world settings),
+   name it, unlink the Dungeon collections from it, and keep `Shared` linked. Add a `<Name>` collection and a
+   `<Name> Pack` collection.
+3. Import the pack's FBX models (`Models/FBX format`) into `<Name> Pack` and move them out of view (x ≥ 14). Clear
+   their animation data and rename them `<pack>-<model>`.
+4. Give them one material: copy an existing `<pack>-colormap` material, swap its image for the pack's
+   `colormap.png`, pack the image (Image → Pack), and assign it to every slot in place of the imported materials.
+5. Set Output Properties → Output to `//../game/assets/bg-<name>.png`, and add a `background` custom property
+   (the lowercase name) on the scene.
+6. Build the layout from linked duplicates within the guides, then render.
+
+## Camera and light (shared)
 - `Camera`: perspective, 50 mm, tilted 26° from straight down (`rotation_euler = (26°, 0, 0)`), roughly at
   (0, −10.30, 21.37). Framed so the whole walled room is centered vertically, with about 58 px of dirt above the back
   wall and 60 px below the front wall. The stairs still run off every edge of the frame.
@@ -53,13 +162,14 @@ The Blender MCP server (`mcp__blender__*`) can inspect and edit the open file. P
 - Render: EEVEE, Standard view transform, exposure 0, 128 samples. **Ray tracing and Fast GI must stay on**: the
   AO node gets its data from them and renders nearly white without them.
 
-## Look: the `Toon Style` node group
-Every pack material is `Image Texture → Toon Style → Material Output`. The original Principled BSDF is still in
+## Look: the `Toon Style` node group (shared)
+Every pack material is `Image Texture → Toon Style → Material Output` (the forest's materials put `Distance Fade`
+in between). The original Principled BSDF is still in
 each material, just unplugged. Reconnect it to Material Output to get the pack's stock shading back.
 
 All look settings live in **one place**: open any material → select the `Toon Style` node → Tab → the
 **Settings** node (a `Toon Core` group). Don't edit the `Toon Style` node's inputs in a material; it only passes the
-texture color through. Changing Settings updates all 31 materials.
+texture color through. Changing Settings updates every material in every background.
 
 | Settings input | Current | Meaning |
 |---|---|---|
@@ -76,7 +186,9 @@ tried and liked: crisp toon shading (Toon Amount 1, AO Strength 0, sun shadows o
 lower `shadow_maximum_resolution` or raise `scene.eevee.shadow_pool_size`.
 
 ## Fitting the game
-`ARENA` in `game/src/config.js` is this render's visible floor, a trapezoid in screen px. Its back edge is x 187–1094
+These measurements come from the shared camera and floor, so they hold for every background.
+
+`ARENA` in `game/src/config.js` is the render's visible floor, a trapezoid in screen px. Its back edge is x 187–1094
 at y 117. Its front edge is x 117–1163 at y 636, where the front wall's top starts hiding the floor. `Character.js` keeps
 each character's feet inside it (`limits()`). If the camera, lens, or room size changes, re-render and re-measure
 the floor corners. Project (±6.5, ±4, 0) and the front wall's inner top (0, −4, 1) with

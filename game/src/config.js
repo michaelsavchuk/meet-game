@@ -10,7 +10,8 @@ export const DISPLAY_FONT = "'Noto Color Emoji', 'Luckiest Guy', Impact, sans-se
 // emoji, which clipped their tops; 🏀 and 🤯 reach the font's highest and lowest points.
 export const TEST_STRING = '|MÉqgy🏀🤯';
 
-// The floor of assets/arena.png (rendered from art/arena.blend), in screen px, where characters' feet stay.
+// The floor of the backgrounds (assets/bg-*.png, rendered from art/arena.blend; they all share it), in screen px, where
+// characters' feet stay.
 // Perspective makes it a trapezoid: `back` and `front` are its left/right edges at y = top and y = bottom
 // (bottom is where the front wall starts hiding the floor). Re-measure if the Blender camera moves.
 export const ARENA = { top: 117, bottom: 636, back: { left: 187, right: 1094 }, front: { left: 117, right: 1163 } };
@@ -23,8 +24,9 @@ export function arenaEdges(y) {
     right: ARENA.back.right + (ARENA.front.right - ARENA.back.right) * t,
   };
 }
-// The staircases in assets/arena.png that characters run in by, in screen px at feet level. `foot` is the bottom step's
-// two ends where it meets the floor; `off` is the same line of the stairs carried on off screen. Measured like ARENA
+// The entrances characters run in by (the dungeon's staircases; hallways and trails in the other backgrounds), in screen
+// px at feet level. `foot` is the bottom step's two ends where it meets the floor; `off` is the same line of the stairs
+// carried on off screen. Measured like ARENA
 // (project the stairs' bottom edge and a point 2 m further out and up); re-measure if the stairs or camera move.
 export const STAIRS = [
   { foot: [[612, 117], [668, 117]], off: [[618, -76], [662, -76]] },      // back

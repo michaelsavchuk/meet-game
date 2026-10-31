@@ -13,6 +13,7 @@ Meet tab (content script) --chrome.runtime messages--> game tab (Phaser, an exte
 |--------------|------------|
 | `game/`      | The extension. `manifest.json`; `extension/` has the Meet content script and the toolbar button's background script; `index.html` is the game, `control.html` the host's control page; `src/bridge.js` turns Meet events into `game.events`; `LobbyScene` and `BattleScene` in `src/scenes/` are the game. |
 | `server/`    | Optional dev server (no dependencies): serves `game/` at localhost, relays fake events, and hosts the `/play` fallback page. |
+| `art/`       | Source art. `arena.blend` renders the arena backgrounds (dungeon, arcade, arena, forest) into `game/assets/`; see `art/README.md`. |
 
 ## How to play
 1. **Lobby**: type anything in chat to join and get a random emoji character. React with any emoji to
@@ -37,6 +38,9 @@ attack players on their own; type the word of one chasing you to parry it. Each 
 more 💜. Clearing a wave heals everyone a heart. When everyone's out, the game shows how far you got. The control
 page's **Co-op difficulty** slider (Very easy to Very hard) changes how many enemies come, how tough they are and how
 often they attack, from the next wave on.
+
+**Backgrounds**: the lobby is an arcade. Battles and co-op take place in a dungeon, an arena or a forest clearing: a
+random one each round, or pick one with the control page's **Background** dropdown.
 
 ## Install
 - **From a clone**: go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `game/` folder.

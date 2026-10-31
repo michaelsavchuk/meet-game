@@ -102,8 +102,16 @@ The control page's co-op difficulty slider (`DIFFICULTIES` in config.js, Normal 
 toughness, HP and rest between attacks; it's a scene-independent `setDifficulty` command, kept in the game page's
 localStorage, and read at the start of each wave.
 
-`art/arena.blend` renders the arena backdrop to `game/assets/arena.png` (Kenney Mini Dungeon tiles, flat texture +
-blue AO). Read `art/README.md` before editing it: layout, camera, and the shared `Toon Style` settings node.
+**Backgrounds** (`src/backgrounds.js`): the lobby is always `assets/bg-arcade.png`; battles and co-op use the
+host's pick from the control page's Background dropdown (Dungeon, Arena or Forest), or by default Random, a different
+one from last round's. The pick is saved in the game page's localStorage like the co-op difficulty, and applies from
+the next round. LobbyScene and BattleScene preload all of them. To add one, render it from the .blend and add it to
+`BATTLE` in backgrounds.js.
+
+`art/arena.blend` renders the backgrounds to `game/assets/bg-<name>.png`, one scene per background (`Dungeon`,
+`Arcade`, `Arena`, `Forest`; Kenney packs, flat texture + blue AO), all sharing one camera, floor, border and entrances
+so `ARENA`/`STAIRS` fit every one. Read `art/README.md` before editing it: collections, the shared camera and guides,
+each layout, adding a background, and the shared `Toon Style` settings node.
 
 `HudScene` runs on top of everything and only shows "disconnected" when the dev server connection drops (never in the extension). Other pieces:
 `roster.js` (players across rounds, name → emoji), `objects/Character.js` (emoji whose hop rate follows

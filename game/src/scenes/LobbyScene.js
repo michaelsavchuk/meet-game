@@ -4,6 +4,7 @@ import { roster } from '../roster.js';
 import { Character, separate } from '../objects/Character.js';
 import { FloorText } from '../objects/FloorText.js';
 import { CHAT_BUBBLE_MS, DEV_EVENTS } from '../config.js';
+import { preloadBackgrounds, addLobbyBackground } from '../backgrounds.js';
 
 const MIN_PLAYERS = { battle: 2, survival: 1 };   // per game mode (scene key)
 const ENTER_STAGGER = 800;   // ms; on returning to the lobby, everyone starts running in within this
@@ -16,12 +17,12 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   preload() {
-    if (!this.textures.exists('arena')) this.load.image('arena', '/assets/arena.png');
+    preloadBackgrounds(this);
   }
 
   create() {
     this.characters = new Map();   // name -> Character
-    this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
+    addLobbyBackground(this);
     this.floorText = new FloorText(this);
     this.updateFloorText();
 

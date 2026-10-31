@@ -6,6 +6,7 @@ import { Character, separate, spreadSpots, randomSpot, clampToFloor } from '../o
 import { Heart } from '../objects/Heart.js';
 import { SpeedLines } from '../objects/SpeedLines.js';
 import { FloorText } from '../objects/FloorText.js';
+import { preloadBackgrounds, addBattleBackground } from '../backgrounds.js';
 import {
   WIDTH, HEIGHT, MAX_HP, DAMAGE, WORD_DELAY, FLEE_SPEED, CHASED_FLEE_SPEED, CHASE_SPEED, CLASH_KNOCKBACK,
   DISPLAY_FONT, SUDDEN_DEATH_AFTER, SUDDEN_DEATH_STEP, SUDDEN_DEATH_BOOST, SUDDEN_DEATH_MAX, COUNTDOWN, COUNTDOWN_STEP,
@@ -55,12 +56,12 @@ export class BattleScene extends Phaser.Scene {
 
   preload() {
     this.load.svg('ko', '/assets/ko.svg');
-    if (!this.textures.exists('arena')) this.load.image('arena', '/assets/arena.png');
+    preloadBackgrounds(this);
   }
 
   create() {
     koAnimation(this);
-    this.add.image(0, 0, 'arena').setOrigin(0).setDepth(-1000);   // rendered from art/arena.blend
+    addBattleBackground(this);   // the host's pick, or a random one
     this.fighting = false;   // false during the countdown: no words, no attacks
     this.over = false;
     this.winner = null;

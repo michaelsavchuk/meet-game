@@ -16,6 +16,7 @@ let lastSeen = 0;
 let devPhase = null;
 let cpus = {};   // name -> level of the CPU players (see bots.js)
 let difficulties = [];   // co-op difficulty labels (config.js DIFFICULTIES)
+let backgroundsShown = false;   // the background options are filled in from the first snapshot
 
 $('open-game').addEventListener('click', () => {
   if (globalThis.chrome?.tabs) chrome.tabs.create({ url: chrome.runtime.getURL('index.html') });
@@ -27,6 +28,7 @@ $('difficulty').addEventListener('input', () => {
   send('setDifficulty', Number($('difficulty').value));
   renderDifficulty(Number($('difficulty').value));
 });
+$('background').addEventListener('change', () => send('setBackground', $('background').value));
 document.querySelectorAll('[data-command]').forEach((button) => button.addEventListener('click', () => send(button.dataset.command)));
 
 channel.onmessage = ({ data }) => {
@@ -72,6 +74,8 @@ function render(state) {
     $('difficulty').value = state.difficulty;
     renderDifficulty(state.difficulty);
   }
+
+  renderBackground(state);
 
   if (lobby) renderLobby(state);
   else if (state.phase === 'survival') renderSurvival(state);
@@ -148,6 +152,18 @@ function renderLog(log) {
   $('log').replaceChildren(...log.map((line) => Object.assign(document.createElement('li'), { textContent: line })));
   if (!log.length) $('log').replaceChildren(Object.assign(document.createElement('li'), { textContent: 'Nothing yet', className: 'muted' }));
   if (atBottom) $('log').scrollTop = $('log').scrollHeight;
+}
+
+// Battle backgrounds (backgrounds.js): Random, then each one; the note says which one random landed on.
+function renderBackground({ background, backgrounds, currentBackground }) {
+  if (!backgrounds) return;
+  if (!backgroundsShown) {
+    backgroundsShown = true;
+    $('background').append(...backgrounds.map((b) => Object.assign(document.createElement('option'), { value: b.id, textContent: b.label })));
+  }
+  if (document.activeElement !== $('background')) $('background').value = background;
+  const now = backgrounds.find((b) => b.id === currentBackground);
+  $('background-now').textContent = background === 'random' && now ? `last picked: ${now.label}` : '';
 }
 
 function renderDifficulty(value) {
