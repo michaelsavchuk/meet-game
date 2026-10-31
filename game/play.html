@@ -26,10 +26,10 @@
     input:focus { outline: 2px solid var(--accent); border-color: transparent; }
     button { font: inherit; font-weight: 600; color: #fff; background: var(--accent); border: 0; border-radius: 10px; padding: 10px 16px; cursor: pointer; }
     button.link { background: none; color: var(--muted); padding: 0; font-weight: 400; text-decoration: underline; }
-    #reactions { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 8px; }
-    #reactions button { background: var(--bg); border: 1px solid var(--line); font-size: 26px; padding: 6px 0;
-      font-family: 'Noto Color Emoji', sans-serif; }
-    #reactions button:active { transform: scale(0.9); }
+    emoji-picker { width: 100%; height: 320px; --border-radius: 10px; --background: var(--bg);
+      --border-color: var(--line); --num-columns: 8; --emoji-size: 1.6rem;
+      --category-emoji-size: 1.25rem; --category-emoji-padding: 0.4rem;
+      --emoji-font-family: 'Noto Color Emoji', sans-serif; }
     #feed { flex: 1; min-height: 120px; overflow-y: auto; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
     #feed li b { font-weight: 600; }
     #feed li.mine b { color: var(--accent); }
@@ -65,15 +65,16 @@
       </form>
       <section>
         <div class="muted" style="font-size: 13px; margin-bottom: 8px;">React to change your character</div>
-        <div id="reactions"></div>
+        <emoji-picker id="picker" class="dark" data-source="vendor/emoji-picker/data.json"></emoji-picker>
       </section>
     </div>
   </main>
 
+  <!-- Emoji picker for reactions (vendored, see `npm run vendor`). -->
+  <script type="module" src="vendor/emoji-picker/index.js"></script>
   <script>
     // Stand-in for Meet chat and reactions: posts the same raw payloads the extension does, so the
     // server and game can't tell the difference. Players are keyed by display name, like in Meet.
-    const REACTIONS = ['💖', '👍', '🎉', '👏', '😂', '😮', '😢', '🤔', '👎', '🔥', '😎', '👻'];
     const $ = (id) => document.getElementById(id);
     // crypto.randomUUID only exists on secure origins, and players may reach this over plain http on a LAN.
     const uid = () => crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
@@ -124,14 +125,8 @@
       post('messages', { id: uid(), userId, sender: name, text, receivedAt: new Date().toISOString() });
     });
 
-    for (const emoji of REACTIONS) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = emoji;
-      b.addEventListener('click', () =>
-        post('reactions', { emoji, participantId: userId, sender: name, receivedAt: new Date().toISOString() }));
-      $('reactions').append(b);
-    }
+    $('picker').addEventListener('emoji-click', (e) =>
+      post('reactions', { emoji: e.detail.unicode, participantId: userId, sender: name, receivedAt: new Date().toISOString() }));
 
     // ---- Feed: everyone's chat, from the same event stream the game reads ----
     function setStatus(ok) {

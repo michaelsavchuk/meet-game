@@ -44,7 +44,7 @@ dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /even
   They join by saying hi, leave when the roster is cleared, and "Remove CPUs" (lobby only) uses `LobbyScene.removePlayer()`.
   Phaser pauses in a background tab, so keep the game window visible for CPUs to play.
 - Play page (`/play` → `game/play.html`, self-contained, dev server only; left out of `npm run package`): a fallback for when the extension can't read Meet. Players
-  pick a name and send chat/reactions in the extension's raw payload shape; it shows everyone's chat from `/events`.
+  pick a name and send chat/reactions (any emoji, from an emoji picker) in the extension's raw payload shape; it shows everyone's chat from `/events`.
   It may be served through a tunnel (ngrok), so it uses relative URLs only and avoids secure-context-only APIs.
 - Solo page (`/solo` → `game/solo.html` + `src/solo.js`, dev server only, left out of `npm run package`): the game in an
   iframe on the left, and the play and control pages as tabs on the right, for playing without Meet. The frames are
@@ -129,10 +129,11 @@ one is left), `config.js` (HP, speeds, sudden death timing, arena bounds and
 other tuning; animation tuning lives at the top of Character.js).
 
 ## Conventions
-- No dependencies beyond Phaser and no build step: the server uses only Node built-ins, and the
+- No dependencies beyond Phaser (and the play page's emoji picker) and no build step: the server uses only Node built-ins, and the
   game is native ES modules. Phaser is vendored at `game/vendor/phaser.js` (the minified ESM build, committed so the
-  extension loads straight from a clone); import it as `import * as Phaser from '/vendor/phaser.js'`. After
-  upgrading the `phaser` devDependency, `npm run vendor` copies it in.
+  extension loads straight from a clone); import it as `import * as Phaser from '/vendor/phaser.js'`. The play page's reactions
+  use `emoji-picker-element`, vendored with its English emoji data in `game/vendor/emoji-picker/` (left out of
+  `npm run package`). After upgrading either devDependency, `npm run vendor` copies them in.
 - **Phaser 4** (4.2.x), not Phaser 3. Most basic APIs match, but check v4 docs/source in
   `node_modules/phaser` before assuming a v3 API exists.
 - Game canvas is a fixed 1280×720, scaled with `Scale.FIT`. Keep text large enough to read in a screen share.

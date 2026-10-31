@@ -66,7 +66,7 @@ reloading the extension. Events come from the dev keys, `curl`, or the play page
 
 ### Without the extension
 If the extension can't read Meet, players can join from the dev server's play page instead: http://localhost:8787/play has a
-name box, a chat box and reaction buttons, and posts the same payloads the extension does. To reach it from other
+name box, a chat box and an emoji picker for reactions, and posts the same payloads the extension does. To reach it from other
 machines, expose the server (for example `ngrok http 8787`, or whatever `PORT` you used) and share `<public url>/play`.
 The page uses only relative URLs, so it works at any host or port. Share the localhost game tab in Meet so players can see it.
 
