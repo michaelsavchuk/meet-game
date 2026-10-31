@@ -76,6 +76,9 @@ export const HEART_ANYWHERE = 0.25;                // chance it lands anywhere o
 // stairs one by one during a wave and attack players on their own, timed like CPU players (bots.js LEVELS) at their level.
 export const ENEMY_EMOJI = ['💀', '🐍', '👹', '👺', '👿', '😈', '🦇', '🕷️', '🦂', '🐀', '☠️', '🧟', '👾'];
 export const ENEMY_TINT = { easy: 0xcfaaff, normal: 0xb88aff, hard: 0x9d62ff };   // purple, deeper the tougher
+// The purple glow behind every enemy (Character.setAura): alpha, and scale of its full size. Their level shows as a
+// name tag.
+export const ENEMY_AURA = { alpha: 0.75, scale: 0.85 };
 export const ENEMY_MAX_HP = 5;
 export const ENEMY_REST = 1.5;          // × a CPU player's pause between attacks, so players get a breather
 export const ENEMY_RUSH = 800;          // ms until the next enemy while too few are on the floor (ENEMIES_PER_PLAYER)

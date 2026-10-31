@@ -7,7 +7,7 @@ import { FloorText } from '../objects/FloorText.js';
 import { addBattleBackground } from '../backgrounds.js';
 import { BattleScene, BANNER_MS, koAnimation } from './BattleScene.js';
 import {
-  MAX_HP, WANDER_SPEED, COUNTDOWN, COUNTDOWN_STEP, DEV_EVENTS, ENEMY_EMOJI, ENEMY_TINT, ENEMY_RUSH, ENEMY_ENTER_SPEED, ENEMIES_PER_PLAYER, ROAM_AVOID_RADIUS,
+  MAX_HP, WANDER_SPEED, COUNTDOWN, COUNTDOWN_STEP, DEV_EVENTS, ENEMY_EMOJI, ENEMY_TINT, ENEMY_AURA, ENEMY_RUSH, ENEMY_ENTER_SPEED, ENEMIES_PER_PLAYER, ROAM_AVOID_RADIUS,
   WAVE_BREAK, WAVE_HEAL, DIFFICULTIES, NORMAL, waveSpec,
 } from '../config.js';
 
@@ -242,8 +242,8 @@ export class SurvivalScene extends BattleScene {
     const level = LEVELS[Phaser.Math.Clamp(Math.floor(toughness + Math.random()), 0, LEVELS.length - 1)];
     const emoji = Phaser.Utils.Array.GetRandom(ENEMY_EMOJI);
     const hp = Phaser.Math.Between(min, max);
-    const character = new Character(this, { name: '', emoji }).setSword(true).setEmojiTint(ENEMY_TINT[level])
-      .setHp(hp, hp, ENEMY_HEART).enter({ speed: ENEMY_ENTER_SPEED });
+    const character = new Character(this, { name: `Level ${LEVELS.indexOf(level) + 1}`, emoji }).setSword(true)
+      .setEmojiTint(ENEMY_TINT[level]).setAura(ENEMY_AURA).setHp(hp, hp, ENEMY_HEART).enter({ speed: ENEMY_ENTER_SPEED });
     this.enemies.push({
       name: emoji, enemy: true, level, brain: new EnemyBrain(level, rest), character, hp, maxHp: hp,
       word: null, lastWord: null, out: false, revealTimer: null, parries: new Set(), arrived: false, lastHitBy: null,

@@ -27,6 +27,8 @@ const SHADOW_COLOR = '20, 30, 110';   // r, g, b
 const SHADOW_ALPHA = 0.55;
 const SHADOW_SIZE = { w: 45, h: 14 };
 const SHADOW_LIFT = 110;   // px of height at which the shadow would vanish
+// A pulsing purple glow behind the emoji (co-op enemies; see setAura), like the heart pickup's.
+const AURA = { radius: 60, stops: [[0, 'rgba(225, 195, 255, 1)'], [0.4, 'rgba(160, 90, 240, 0.5)'], [1, 'rgba(120, 60, 220, 0)']], ms: 700 };
 
 const SWORD = '🗡️';
 const SHIELD = '🛡️';
@@ -46,7 +48,7 @@ const VX_FOLLOW = 8;
 const SWORD_ANGLE = 120;
 
 // The shadow texture, drawn once per game: a radial gradient squashed into an ellipse by the image's scale.
-function shadowTexture(scene) {
+export function shadowTexture(scene) {
   if (!scene.textures.exists('shadow')) {
     const size = 64;
     const texture = scene.textures.createCanvas('shadow', size, size);
@@ -60,6 +62,26 @@ function shadowTexture(scene) {
     texture.refresh();
   }
   return 'shadow';
+}
+
+// A soft round glow of `radius` px through the gradient `stops` ([offset, CSS color] pairs), drawn once per key.
+export function glowTexture(scene, key, { radius, stops }) {
+  if (!scene.textures.exists(key)) {
+    const size = radius * 2;
+    const t = scene.textures.createCanvas(key, size, size);
+    const g = t.context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    for (const [offset, color] of stops) g.addColorStop(offset, color);
+    t.context.fillStyle = g;
+    t.context.fillRect(0, 0, size, size);
+    t.refresh();
+  }
+  return key;
+}
+
+// How much to scale a shadow by, and its alpha, for something `height` px off the ground: it shrinks and fades.
+export function shadowAt(height) {
+  const ground = Phaser.Math.Clamp(1 - height / SHADOW_LIFT, 0, 1);
+  return { scale: 0.4 + 0.6 * ground, alpha: SHADOW_ALPHA * ground };
 }
 
 // Where a character's position can be so it stands on the floor: top/bottom, and left/right at height y.
@@ -209,6 +231,21 @@ export class Character extends Phaser.GameObjects.Container {
     return this;
   }
 
+  // A pulsing purple glow behind the emoji, at this `alpha` and `scale` (of its full size), e.g. co-op enemies.
+  setAura({ alpha, scale }) {
+    const { scene } = this;
+    if (!this.aura) {
+      this.aura = scene.add.image(0, 0, glowTexture(scene, 'aura', AURA));
+      this.figure.addAt(this.aura, 0);
+    }
+    scene.tweens.killTweensOf(this.aura);
+    scene.tweens.add({
+      targets: this.aura, alpha: { from: alpha, to: alpha * 0.55 }, scale: { from: scale * 1.1, to: scale * 0.9 },
+      duration: AURA.ms, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
+    return this;
+  }
+
   // Show text in the speech bubble. `highlight` styles it as a battle word; null hides the bubble.
   setBubble(text, { highlight = false, pop = false } = {}) {
     this.stopTyping();
@@ -314,9 +351,8 @@ export class Character extends Phaser.GameObjects.Container {
 
   // Shrink and fade the shadow the higher the figure is off the ground.
   updateShadow() {
-    const ground = Phaser.Math.Clamp(1 + this.figure.y / SHADOW_LIFT, 0, 1);
-    const scale = 0.4 + 0.6 * ground;
-    this.shadow.setScale(this.shadowScale.x * scale, this.shadowScale.y * scale).setAlpha(SHADOW_ALPHA * ground);
+    const { scale, alpha } = shadowAt(-this.figure.y);
+    this.shadow.setScale(this.shadowScale.x * scale, this.shadowScale.y * scale).setAlpha(alpha);
   }
 
   // Offset the sword and shield from their resting spots by `lag` px of hop they haven't caught up with yet.
@@ -561,6 +597,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.hearts.setVisible(false);
     this.nameText.setVisible(false);
     this.shadow.setVisible(false);   // nothing to cast it on once flying at the camera
+    this.aura?.setVisible(false);
     this.figure.setY(0).setAngle(0);
     this.emoji.setAngle(0);
     this.scene.tweens.killTweensOf(this.emoji);   // no hurt() flash: fly out solid
@@ -607,6 +644,7 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   destroy(fromScene) {
+    if (this.aura) this.scene?.tweens.killTweensOf(this.aura);
     this.bubble?.destroy();
     super.destroy(fromScene);
   }

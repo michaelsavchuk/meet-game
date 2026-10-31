@@ -1,21 +1,24 @@
 import * as Phaser from '/vendor/phaser.js';
 import { HEIGHT } from '../config.js';
+import { shadowTexture, shadowAt, glowTexture } from './Character.js';
 
 // A heart pickup (BattleScene): drops from the top of the screen onto a spot on the floor, its shadow growing there
-// as it falls, and lands with a bounce and a ring. Then it floats, beating, in a rotating sunburst with a pulsing glow
-// and orbiting sparkles, its word in a pink bubble. A character that reaches it collect()s it; after `lifetime` ms on
+// as it falls, and lands with a bounce and a ring. Then it floats, beating, in a rotating sunburst with a pulsing glow,
+// its word in a pink bubble. A character that reaches it collect()s it; after `lifetime` ms on
 // the ground (blinking near the end) it expire()s by itself.
 const SIZE = 56;               // px font size of the 💖
 const FALL_MS = 900;
 const TRAIL_EVERY = 45;        // ms between ✨ left behind while falling
 const FLOAT = { height: 8, ms: 900 };   // bob while waiting
 const BEAT_MS = 700;           // one heartbeat (two quick pulses)
-const RAYS = { count: 12, radius: 90, spinMs: 6000, alpha: 0.55 };
-const GLOW = { radius: 70, alpha: { min: 0.45, max: 0.9 }, ms: 600 };
-const SPARKLES = { count: 3, radius: { x: 52, y: 22 }, spinMs: 2400 };
+const RAYS = { count: 12, radius: 90, inner: 'rgba(255, 240, 180, 1)', outer: 'rgba(255, 216, 77, 0)', spinMs: 6000, alpha: 0.55 };
+const GLOW = {
+  radius: 70, stops: [[0, 'rgba(255, 230, 240, 1)'], [0.35, 'rgba(255, 110, 160, 0.8)'], [1, 'rgba(255, 92, 138, 0)']],
+  alpha: { min: 0.45, max: 0.9 }, ms: 600,
+};
 const RING = { radius: 90, ms: 450 };
 const BLINK_FOR = 3000;        // ms before expiring that it starts blinking
-const SHADOW = { w: 50, h: 15, alpha: 0.55 };
+const SHADOW = { w: 50, h: 15 };    // the characters' soft blue shadow, a little wider
 const PINK = 0xff5c8a;
 const GOLD = 0xffd84d;
 const BUBBLE_FILL = 0xffc6d9;
@@ -23,29 +26,18 @@ const LIFT = 34;               // the heart floats this far above its spot (wher
 const BUBBLE_ABOVE = 44;       // the bubble's tail tip is this far above the heart's center
 const SCREEN_MARGIN = 8;       // px the bubble keeps from the top of the screen
 
-// Canvas textures drawn once per game: a soft radial glow and a sunburst whose rays fade outward.
-function textures(scene) {
-  if (!scene.textures.exists('heartGlow')) {
-    const size = GLOW.radius * 2;
-    const t = scene.textures.createCanvas('heartGlow', size, size);
-    const g = t.context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    g.addColorStop(0, 'rgba(255, 230, 240, 1)');
-    g.addColorStop(0.35, 'rgba(255, 110, 160, 0.8)');
-    g.addColorStop(1, 'rgba(255, 92, 138, 0)');
-    t.context.fillStyle = g;
-    t.context.fillRect(0, 0, size, size);
-    t.refresh();
-  }
-  if (!scene.textures.exists('heartRays')) {
-    const size = RAYS.radius * 2;
-    const t = scene.textures.createCanvas('heartRays', size, size);
+// A sunburst texture of `count` rays fading from `inner` to `outer` (CSS colors) at `radius` px, drawn once per key.
+function sunburstTexture(scene, key, { count, radius, inner, outer }) {
+  if (!scene.textures.exists(key)) {
+    const size = radius * 2;
+    const t = scene.textures.createCanvas(key, size, size);
     const ctx = t.context;
     const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    g.addColorStop(0, 'rgba(255, 240, 180, 1)');
-    g.addColorStop(1, 'rgba(255, 216, 77, 0)');
+    g.addColorStop(0, inner);
+    g.addColorStop(1, outer);
     ctx.fillStyle = g;
-    const step = (Math.PI * 2) / RAYS.count;
-    for (let i = 0; i < RAYS.count; i++) {
+    const step = (Math.PI * 2) / count;
+    for (let i = 0; i < count; i++) {
       ctx.beginPath();
       ctx.moveTo(size / 2, size / 2);
       ctx.arc(size / 2, size / 2, size / 2, i * step, i * step + step * 0.45);
@@ -54,6 +46,7 @@ function textures(scene) {
     }
     t.refresh();
   }
+  return key;
 }
 
 export class Heart extends Phaser.GameObjects.Container {
@@ -61,7 +54,6 @@ export class Heart extends Phaser.GameObjects.Container {
   // nobody grabs it in time.
   constructor(scene, x, y, word, { lifetime, onLanded, onExpire }) {
     super(scene, x, y);
-    textures(scene);
     this.word = word;
     this.landed = false;
     this.gone = false;
@@ -72,20 +64,21 @@ export class Heart extends Phaser.GameObjects.Container {
     const w = this.bubbleText.width + 24;
     const h = this.bubbleText.height + 14;
     this.bubbleText.setY(-h / 2 - 8);
-    this.bubbleBg.fillStyle(BUBBLE_FILL, 1).lineStyle(3, PINK, 1)
-      .fillRoundedRect(-w / 2, -h - 8, w, h, 12).strokeRoundedRect(-w / 2, -h - 8, w, h, 12)
+    this.bubbleBg.fillStyle(BUBBLE_FILL, 1)
+      .fillRoundedRect(-w / 2, -h - 8, w, h, 12)
       .fillTriangle(-8, -9, 8, -9, 0, 0);
     // Land low enough that the bubble clears the top of the screen even at the top of the float.
     this.y = y = Math.max(y, LIFT + FLOAT.height + BUBBLE_ABOVE + h + 8 + SCREEN_MARGIN);
     this.bubble = scene.add.container(x, y - LIFT - BUBBLE_ABOVE, [this.bubbleBg, this.bubbleText]).setDepth(10000).setVisible(false);
 
-    this.shadow = scene.add.ellipse(0, 22, SHADOW.w, SHADOW.h, 0x141e6e, SHADOW.alpha).setScale(0.2).setAlpha(0);
-    this.rays = scene.add.image(0, 0, 'heartRays').setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setScale(0.3);
-    this.glow = scene.add.image(0, 0, 'heartGlow').setBlendMode(Phaser.BlendModes.ADD);
+    this.shadow = scene.add.image(0, 22, shadowTexture(scene)).setDisplaySize(SHADOW.w, SHADOW.h);
+    this.shadowScale = { x: this.shadow.scaleX, y: this.shadow.scaleY };
+    this.rays = scene.add.image(0, 0, sunburstTexture(scene, 'heartRays', RAYS)).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0).setScale(0.3);
+    this.glow = scene.add.image(0, 0, glowTexture(scene, 'heartGlow', GLOW)).setBlendMode(Phaser.BlendModes.ADD);
     this.emoji = scene.add.text(0, 0, '💖', { fontSize: `${SIZE}px` }).setOrigin(0.5);
-    this.sparkles = Array.from({ length: SPARKLES.count }, () => scene.add.text(0, 0, '✨', { fontSize: '22px' }).setOrigin(0.5).setVisible(false));
-    this.figure = scene.add.container(0, -(y + 100), [this.rays, this.glow, this.emoji, ...this.sparkles]);
+    this.figure = scene.add.container(0, -(y + 100), [this.rays, this.glow, this.emoji]);
     this.add([this.shadow, this.figure]);
+    this.updateShadow();
     this.setDepth(y);   // in front of characters behind it
 
     scene.add.existing(this);
@@ -98,10 +91,9 @@ export class Heart extends Phaser.GameObjects.Container {
     });
   }
 
-  // Drop in with a bounce, the shadow growing under the landing spot and ✨ streaming behind.
+  // Drop in with a bounce, ✨ streaming behind (the shadow grows under the landing spot in update()).
   fall(onLanded) {
     const { scene } = this;
-    scene.tweens.add({ targets: this.shadow, scale: 1, alpha: SHADOW.alpha, duration: FALL_MS, ease: 'Quad.easeIn' });
     this.trail = scene.time.addEvent({ delay: TRAIL_EVERY, loop: true, callback: () => this.sparkleAt(this.x, this.y + this.figure.y, 400) });
     scene.tweens.add({
       targets: this.figure, y: -LIFT, duration: FALL_MS, ease: 'Bounce.easeOut',
@@ -118,7 +110,7 @@ export class Heart extends Phaser.GameObjects.Container {
     const ring = scene.add.ellipse(this.x, this.y + 22, 20, 8).setStrokeStyle(4, PINK).setDepth(this.depth - 1);
     scene.tweens.add({ targets: ring, scaleX: RING.radius / 10, scaleY: RING.radius / 10, alpha: 0, duration: RING.ms, onComplete: () => ring.destroy() });
 
-    // The standout effect: a spinning sunburst, a pulsing glow, a heartbeat, a float, and sparkles in orbit.
+    // The standout effect: a spinning sunburst, a pulsing glow, a heartbeat and a float.
     scene.tweens.add({ targets: this.rays, alpha: RAYS.alpha, scale: 1, duration: 300, ease: 'Back.easeOut' });
     scene.tweens.add({ targets: this.rays, angle: 360, duration: RAYS.spinMs, repeat: -1 });
     scene.tweens.add({ targets: this.glow, alpha: { from: GLOW.alpha.max, to: GLOW.alpha.min }, scale: { from: 1.1, to: 0.85 }, duration: GLOW.ms, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -130,25 +122,23 @@ export class Heart extends Phaser.GameObjects.Container {
       ],
     });
     this.floatTween = scene.tweens.add({ targets: this.figure, y: -LIFT - FLOAT.height, duration: FLOAT.ms, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-    this.orbit = 0;
-    for (const s of this.sparkles) s.setVisible(true);
 
     this.bubble.setVisible(true);
     scene.tweens.add({ targets: this.bubble, scale: { from: 0.3, to: 1 }, duration: 250, ease: 'Back.easeOut' });
     onLanded?.();
   }
 
-  // Scenes call this every frame: sparkles circle the heart (in front on the near side) and twinkle.
-  update(time, delta) {
-    if (!this.landed || this.gone) return;
-    this.orbit += (delta / SPARKLES.spinMs) * Math.PI * 2;
-    this.sparkles.forEach((s, i) => {
-      const a = this.orbit + (i / this.sparkles.length) * Math.PI * 2;
-      s.setPosition(Math.cos(a) * SPARKLES.radius.x, Math.sin(a) * SPARKLES.radius.y + 6);
-      s.setScale(0.6 + 0.4 * Math.abs(Math.sin(time / 250 + i)));
-      this.figure.moveTo(s, Math.sin(a) > 0 ? this.figure.length - 1 : 0);   // behind the rays when on the far side
-    });
-    this.bubble.setY(this.y + this.figure.y - BUBBLE_ABOVE);
+  // Scenes call this every frame: the shadow follows the heart's height and the bubble follows its float.
+  update() {
+    if (this.gone) return;
+    this.updateShadow();
+    if (this.landed) this.bubble.setY(this.y + this.figure.y - BUBBLE_ABOVE);
+  }
+
+  // Like a character's shadow: shrinks and fades the higher the heart is above where it rests.
+  updateShadow() {
+    const { scale, alpha } = shadowAt(-this.figure.y - LIFT);
+    this.shadow.setScale(this.shadowScale.x * scale, this.shadowScale.y * scale).setAlpha(alpha);
   }
 
   // Blink for the last BLINK_FOR ms before it runs out, so players see it's about to go.

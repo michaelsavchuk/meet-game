@@ -94,7 +94,7 @@ Phases, one scene each (`game/src/scenes/`):
 the players (so hearts, bots and `alive()` work unchanged); enemies are in `enemies`. Each wave (`waveSpec()` in config.js:
 more enemies, more HP, and tougher levels as waves go on) starts after the last one's "Wave N cleared!" banner (the
 first opens with "Type to survive!"); its enemies (`ENEMY_EMOJI`,
-tinted purple by level with `setEmojiTint()`, 💜 HP, no name tag) run in from the stairs one by one through the wave and
+tinted purple by level with `setEmojiTint()` over a pulsing purple glow, `setAura()`, 💜 HP, "Level N" as a name tag) run in from the stairs one by one through the wave and
 get a word once off the stairs. Enemies attack on their own via `EnemyBrain` (bots.js), which reuses CPU levels, timing and
 `pickTarget()`; players counter them like in a battle, and CPU players attack enemies (bots use `scene.foes(me)`). Roaming
 players and enemies steer away from each other (`ROAM_AVOID_RADIUS`). Clearing a wave heals survivors `WAVE_HEAL`, late
