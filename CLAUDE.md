@@ -52,7 +52,8 @@ dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /even
 Phases, one scene each (`game/src/scenes/`):
 1. **LobbyScene**: chatting anything joins (random character emoji) and your character runs in from a random
    staircase; any reaction changes your emoji. Returning to the lobby, everyone runs in again.
-   Host clicks Start on the control page (2+ players) or presses Enter on the game. "Clear players" empties the roster.
+   Host clicks Start battle on the control page (2+ players) or presses Enter on the game, or Start co-op (1+).
+   "Clear players" empties the roster.
 2. **BattleScene**: everyone in the roster runs in from a random staircase to spread-out spots (`spreadSpots()`)
    while the banner counts down 3-2-1 (`COUNTDOWN`), timed to arrive just before it ends. Then "Type to Fight!", and once that banner is gone (so it hides
    nobody's word) everyone gets a unique word (`words.js`) in a speech bubble; until then (`fighting` false) chat does nothing. Typing
@@ -88,6 +89,19 @@ Phases, one scene each (`game/src/scenes/`):
    People who join mid-round and knocked-out players just watch; late joiners are in the next round.
 3. **Winner**: last one standing gets a banner in BattleScene; "Back to lobby" (control page) / Enter keeps the roster.
 
+**Co-op** (`SurvivalScene`, extends BattleScene through its hooks: `everyone()`, `foes()`, `carriesWord()`, `steer()`,
+`hit()`/`retype()`, `heartIcon()`): players have no words and fight waves of enemies together. `fighters` is still just
+the players (so hearts, bots and `alive()` work unchanged); enemies are in `enemies`. Each wave (`waveSpec()` in config.js:
+more enemies, more HP, and tougher levels as waves go on) is announced with the flash banner; its enemies (`ENEMY_EMOJI`,
+tinted purple by level with `setEmojiTint()`, 💜 HP, no name tag) run in from the stairs one by one through the wave and
+get a word once off the stairs. Enemies attack on their own via `EnemyBrain` (bots.js), which reuses CPU levels, timing and
+`pickTarget()`; players counter them like in a battle, and CPU players attack enemies (bots use `scene.foes(me)`). Roaming
+players and enemies steer away from each other (`ROAM_AVOID_RADIUS`). Clearing a wave heals survivors `WAVE_HEAL`, late
+joiners run in, and the next wave starts. When every player is out: "You made it to wave N!". No sudden death.
+The control page's co-op difficulty slider (`DIFFICULTIES` in config.js, Normal by default) scales enemy count,
+toughness, HP and rest between attacks; it's a scene-independent `setDifficulty` command, kept in the game page's
+localStorage, and read at the start of each wave.
+
 `art/arena.blend` renders the arena backdrop to `game/assets/arena.png` (Kenney Mini Dungeon tiles, flat texture +
 blue AO). Read `art/README.md` before editing it: layout, camera, and the shared `Toon Style` settings node.
 
@@ -122,7 +136,8 @@ other tuning; animation tuning lives at the top of Character.js).
 - Dev keys on the game page, also buttons on the control page, when `DEV_EVENTS` is true in `config.js` (default false; fake events take the same path as real ones): lobby **C** = a fake player joins,
   **R** = a random player reacts; battle **C** = a random fighter attacks another, **X** = a non-word chat,
   **T** = a typo of someone's word, **P** = a chased fighter counters their chaser,
-  **H** = drop a heart now, **G** = a random fighter goes for the heart.
+  **H** = drop a heart now, **G** = a random fighter goes for the heart; co-op **C**/**T**/**P**/**R**/**H**/**G** likewise
+  against enemies, **E** = an extra enemy runs in now.
   Or `curl -XPOST localhost:8787/messages -d '{"id":"1","userId":"u","sender":"Ada","text":"hi","receivedAt":"t"}'`.
 - `window.game` is the Phaser game, e.g. `game.scene.getScene('battle').fighters` in the console.
 

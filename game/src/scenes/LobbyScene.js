@@ -5,11 +5,11 @@ import { Character, separate } from '../objects/Character.js';
 import { FloorText } from '../objects/FloorText.js';
 import { CHAT_BUBBLE_MS, DEV_EVENTS } from '../config.js';
 
-const MIN_PLAYERS = 2;
+const MIN_PLAYERS = { battle: 2, survival: 1 };   // per game mode (scene key)
 const ENTER_STAGGER = 800;   // ms; on returning to the lobby, everyone starts running in within this
 
-// Phase 1: anyone who chats joins and gets a random emoji; reacting changes it. The host starts the game from
-// the control page (or presses Enter).
+// Phase 1: anyone who chats joins and gets a random emoji; reacting changes it. The host starts a battle or co-op from
+// the control page (or presses Enter for a battle).
 export class LobbyScene extends Phaser.Scene {
   constructor() {
     super('lobby');
@@ -32,6 +32,7 @@ export class LobbyScene extends Phaser.Scene {
     // Commands from the control page (see remote.js). Dev: C = a fake player joins, R = a random player reacts.
     this.commands = {
       start: () => this.startGame(),
+      coop: () => this.startGame('survival'),
       clear: () => this.clearPlayers(),
       C: () => {
         const free = FAKE_NAMES.filter((n) => !roster.has(n));
@@ -50,7 +51,7 @@ export class LobbyScene extends Phaser.Scene {
 
   // What the control page shows (see remote.js).
   snapshot() {
-    return { phase: 'lobby', canStart: roster.size >= MIN_PLAYERS, players: roster.all() };
+    return { phase: 'lobby', canStart: roster.size >= MIN_PLAYERS.battle, canStartCoop: roster.size >= MIN_PLAYERS.survival, players: roster.all() };
   }
 
   update(time, delta) {
@@ -110,7 +111,8 @@ export class LobbyScene extends Phaser.Scene {
     this.updateFloorText();
   }
 
-  startGame() {
-    if (roster.size >= MIN_PLAYERS) this.scene.start('battle');
+  // `mode` is the scene: 'battle' or 'survival' (co-op).
+  startGame(mode = 'battle') {
+    if (roster.size >= MIN_PLAYERS[mode]) this.scene.start(mode);
   }
 }

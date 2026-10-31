@@ -6,6 +6,7 @@ const STALE_MS = 2000;   // no snapshot for this long = the game page is closed
 const DEV = {
   lobby: [['C', 'Fake player joins'], ['R', 'Fake reaction']],
   battle: [['C', 'Fake attack'], ['X', 'Fake chatter'], ['T', 'Fake typo'], ['P', 'Fake counter'], ['R', 'Fake reaction'], ['H', 'Drop a heart'], ['G', 'Fake heart grab']],
+  survival: [['C', 'Fake attack'], ['T', 'Fake typo'], ['P', 'Fake counter'], ['R', 'Fake reaction'], ['H', 'Drop a heart'], ['G', 'Fake heart grab'], ['E', 'Spawn an enemy']],
 };
 
 const $ = (id) => document.getElementById(id);
@@ -14,6 +15,7 @@ const send = (name, arg) => channel.postMessage({ type: 'command', name, arg });
 let lastSeen = 0;
 let devPhase = null;
 let cpus = {};   // name -> level of the CPU players (see bots.js)
+let difficulties = [];   // co-op difficulty labels (config.js DIFFICULTIES)
 
 $('open-game').addEventListener('click', () => {
   if (globalThis.chrome?.tabs) chrome.tabs.create({ url: chrome.runtime.getURL('index.html') });
@@ -21,6 +23,10 @@ $('open-game').addEventListener('click', () => {
 });
 $('add-cpu').addEventListener('click', () => send('addCpu', $('cpu-level').value));
 $('remove-cpus').addEventListener('click', () => send('removeCpus'));
+$('difficulty').addEventListener('input', () => {
+  send('setDifficulty', Number($('difficulty').value));
+  renderDifficulty(Number($('difficulty').value));
+});
 document.querySelectorAll('[data-command]').forEach((button) => button.addEventListener('click', () => send(button.dataset.command)));
 
 channel.onmessage = ({ data }) => {
@@ -45,6 +51,8 @@ function render(state) {
   const lobby = state.phase === 'lobby';
   button('start').hidden = !lobby;
   button('start').disabled = !state.canStart;
+  button('coop').hidden = !lobby;
+  button('coop').disabled = !state.canStartCoop;
   button('clear').hidden = !lobby;
   button('end').hidden = lobby;
   button('end').textContent = state.over ? 'Back to lobby' : 'End round';
@@ -54,15 +62,25 @@ function render(state) {
   cpus = state.cpus ?? {};
   const nCpus = Object.keys(cpus).length;
   $('remove-cpus').hidden = !lobby || !nCpus;
-  $('cpu-note').textContent = lobby ? 'CPUs join by chatting and play through chat like anyone else.' : 'CPUs added now join next round.';
+  $('cpu-note').textContent = lobby ? 'CPUs join by chatting and play through chat like anyone else.' : `CPUs added now join next ${state.phase === 'survival' ? 'wave' : 'round'}.`;
+  $('enemies-section').hidden = state.phase !== 'survival';
+
+  // Don't fight the slider while it's being dragged.
+  if (state.difficulties && document.activeElement !== $('difficulty')) {
+    difficulties = state.difficulties;
+    $('difficulty').max = difficulties.length - 1;
+    $('difficulty').value = state.difficulty;
+    renderDifficulty(state.difficulty);
+  }
 
   if (lobby) renderLobby(state);
+  else if (state.phase === 'survival') renderSurvival(state);
   else renderBattle(state);
 }
 
 function renderLobby({ players, canStart }) {
   const n = players.length;
-  $('summary').textContent = `Lobby · ${n} player${n === 1 ? '' : 's'}${canStart ? '' : ' (need 2 to start)'}`;
+  $('summary').textContent = `Lobby · ${n} player${n === 1 ? '' : 's'}${canStart ? '' : ' (need 2 for a battle)'}`;
   $('players-title').textContent = 'Players';
   $('players').replaceChildren(...players.map((p) => row([cell(p.emoji, 'emoji'), nameCell(p.name)])));
   if (!n) $('players').replaceChildren(row([cell('Nobody yet. Anyone who chats in the call joins.', 'muted')]));
@@ -88,12 +106,52 @@ function renderBattle({ fighting, over, winner, boost, heart, maxHp, fighters, w
     tr.classList.toggle('out', f.out);
     return tr;
   }));
-  $('waiting').textContent = waiting.length ? `Next round: ${waiting.map((p) => `${p.emoji} ${p.name}${cpus[p.name] ? ' 🤖' : ''}`).join(', ')}` : '';
+  renderWaiting(waiting, 'Next round');
+  renderLog(log);
+}
 
+function renderSurvival({ fighting, over, wave, toCome, heart, maxHp, fighters, enemies, waiting, log }) {
+  const alive = fighters.filter((f) => !f.out).length;
+  $('summary').replaceChildren(over ? `☠️ Made it to wave ${wave}` : !wave ? 'Co-op · get ready…' : `Co-op · wave ${wave} · ${alive} of ${fighters.length} standing`);
+  if (wave && !over) $('summary').append(' · ', span(`${enemies.length + toCome} enemies left`, 'purple'));
+  if (heart && !over) $('summary').append(' · ', `💖 ${heart}`);
+
+  $('players-title').textContent = 'Players';
+  $('players').replaceChildren(...fighters.map((f) => {
+    const tr = row([
+      cell(f.emoji, 'emoji'),
+      nameCell(f.name),
+      cell('❤️'.repeat(f.hp) + '🖤'.repeat(Math.max(0, maxHp - f.hp))),
+      cell(fighterState(f), 'state'),
+    ]);
+    tr.classList.toggle('out', f.out);
+    return tr;
+  }));
+  $('enemies').replaceChildren(...enemies.map((e) => row([
+    cell(e.emoji, 'emoji'),
+    cell(e.level, 'muted'),
+    cell('💜'.repeat(e.hp) + '🖤'.repeat(Math.max(0, e.maxHp - e.hp))),
+    cell(e.word ?? (e.entering ? 'running in' : '… typing'), 'word'),
+    cell(e.chasing ? `⚔️ chasing ${e.chasing}` : '', 'state'),
+  ])));
+  if (!enemies.length) $('enemies').replaceChildren(row([cell(fighting && !over && toCome ? `${toCome} still to come` : 'None on the floor', 'muted')]));
+  renderWaiting(waiting, 'Next wave');
+  renderLog(log);
+}
+
+function renderWaiting(waiting, label) {
+  $('waiting').textContent = waiting.length ? `${label}: ${waiting.map((p) => `${p.emoji} ${p.name}${cpus[p.name] ? ' 🤖' : ''}`).join(', ')}` : '';
+}
+
+function renderLog(log) {
   const atBottom = $('log').scrollHeight - $('log').scrollTop - $('log').clientHeight < 8;
   $('log').replaceChildren(...log.map((line) => Object.assign(document.createElement('li'), { textContent: line })));
   if (!log.length) $('log').replaceChildren(Object.assign(document.createElement('li'), { textContent: 'Nothing yet', className: 'muted' }));
   if (atBottom) $('log').scrollTop = $('log').scrollHeight;
+}
+
+function renderDifficulty(value) {
+  $('difficulty-label').textContent = difficulties[value] ?? '';
 }
 
 function fighterState(f) {

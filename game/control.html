@@ -34,9 +34,12 @@
     td.name { font-weight: 600; }
     td.word { font-family: ui-monospace, monospace; }
     td.state { color: var(--muted); text-align: right; font-size: 13px; }
+    #summary .purple { color: #c9a3ff; }
     tr.out td { opacity: 0.4; }
     .muted { color: var(--muted); }
     select { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+    #difficulty { flex: 1; min-width: 120px; max-width: 280px; accent-color: #c9a3ff; }
+    #difficulty-label { font-weight: 600; min-width: 80px; }
     .cpu { font-weight: 400; font-size: 13px; color: var(--muted); margin-left: 6px; }
     #log { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; max-height: 260px; overflow-y: auto; }
     #missing { display: none; }
@@ -71,7 +74,8 @@
       <section>
         <div id="summary"></div>
         <div class="row">
-          <button data-command="start">Start game ⚔️</button>
+          <button data-command="start">Start battle ⚔️</button>
+          <button data-command="coop">Start co-op 🛡️</button>
           <button data-command="clear" class="secondary">Clear players</button>
           <button data-command="end" class="secondary">End round</button>
         </div>
@@ -79,6 +83,15 @@
           <h2 style="margin-top: 16px;">Dev: fake events <span style="text-transform: none; letter-spacing: 0;">(keys work on the game page too)</span></h2>
           <div class="row" id="dev"></div>
         </div>
+      </section>
+
+      <section>
+        <h2>Co-op difficulty</h2>
+        <div class="row">
+          <input id="difficulty" type="range" min="0" max="4" step="1" aria-label="Co-op difficulty">
+          <span id="difficulty-label"></span>
+        </div>
+        <p id="difficulty-note" class="muted" style="margin: 10px 0 0;">More, tougher enemies that attack more often. Applies from the next wave.</p>
       </section>
 
       <section>
@@ -102,8 +115,13 @@
         <p id="waiting" class="muted" style="margin: 10px 0 0;"></p>
       </section>
 
+      <section id="enemies-section">
+        <h2>Enemies</h2>
+        <table><tbody id="enemies"></tbody></table>
+      </section>
+
       <section id="log-section">
-        <h2>Battle log</h2>
+        <h2>Log</h2>
         <ul id="log"></ul>
       </section>
     </div>

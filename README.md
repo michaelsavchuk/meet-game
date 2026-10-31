@@ -31,6 +31,13 @@ Meet tab (content script) --chrome.runtime messages--> game tab (Phaser, an exte
      "that's you!", "too late!" for an old word, or "busy!" mid-chase.
 3. **Winner**: the last player standing wins. **Back to lobby** (control page, or Enter) starts over with the same players.
 
+**Co-op** (**Start co-op** on the control page, 1+ players): everyone teams up against waves of purple-tinted enemies
+(💀🐍👹…) that run in throughout each wave. Players have no words; enemies do, so type an enemy's word to hit it. Enemies
+attack players on their own; type the word of one chasing you to parry it. Each wave brings more, tougher enemies with
+more 💜. Clearing a wave heals everyone a heart. When everyone's out, the game shows how far you got. The control
+page's **Co-op difficulty** slider (Very easy to Very hard) changes how many enemies come, how tough they are and how
+often they attack, from the next wave on.
+
 ## Install
 - **From a clone**: go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `game/` folder.
 - **To share it**: `npm run package` makes `dist/meet-game.zip`, which you can upload to the Chrome Web Store (publish it

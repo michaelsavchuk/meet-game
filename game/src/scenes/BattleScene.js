@@ -22,7 +22,7 @@ const MISS_COLORS = { 'so close!': '#ffd84d', '❌': '#ffffff' };
 const BANNER_SIZE = 88;          // px font size; long text is scaled down to fit
 const BANNER_ANGLE = -4;         // degrees
 const BANNER_PADDING = 24;       // px of bar above and below the text
-const BANNER_MS = 1600;          // how long a flash banner stays up
+export const BANNER_MS = 1600;          // how long a flash banner stays up
 const FLASH_MS = 600;            // how long a still banner (`animate: false`) stays up
 const BANNER_STAGGER = 50;       // ms between letters starting to fly in
 const BANNER_FLY_MS = 320;       // ms for each letter to fly in
@@ -37,9 +37,10 @@ const ENTER_SLACK = 150;          // ms before "Type to Fight!" by which everyon
 // Phase 2: everyone runs in during a countdown, then gets a word. Typing another player's word sends your character
 // to attack them.
 // Last one standing wins (phase 3: the winner banner, then back to the lobby).
+// SurvivalScene (co-op) builds on this one, through the hooks under "Who fights whom".
 export class BattleScene extends Phaser.Scene {
-  constructor() {
-    super('battle');
+  constructor(key = 'battle') {
+    super(key);
   }
 
   preload() {
@@ -55,7 +56,7 @@ export class BattleScene extends Phaser.Scene {
     this.over = false;
     this.winner = null;
     this.log = [];
-    // name -> { name, character, hp, word, lastWord, out, revealTimer, parries }. After a hit, word is null
+    // name -> { name, character, hp, maxHp, word, lastWord, out, revealTimer, parries }. After a hit, word is null
     // while they "type" a new one (lastWord keeps the old one), and revealTimer brings a new one.
     // parries holds the chasers this fighter has countered (typed their word back); see land().
     this.fighters = new Map();
@@ -75,7 +76,7 @@ export class BattleScene extends Phaser.Scene {
       const delay = Phaser.Math.Between(0, ENTER_STAGGER);
       const character = new Character(this, player).setSword(true).setHp(MAX_HP, MAX_HP)
         .enter({ spot: spots[i], delay, duration: countdown - ENTER_SLACK - delay });
-      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, word: null, lastWord: null, out: false, revealTimer: null, parries: new Set() });
+      this.fighters.set(player.name, { name: player.name, character, hp: MAX_HP, maxHp: MAX_HP, word: null, lastWord: null, out: false, revealTimer: null, parries: new Set() });
     }
 
     this.updateFloorText();
@@ -165,7 +166,7 @@ export class BattleScene extends Phaser.Scene {
   update(time, delta) {
     this.updateSuddenDeath(time);
     this.updateBanner();
-    const fighters = [...this.fighters.values()];
+    const fighters = this.everyone();
     const characters = fighters.map((f) => f.character);
     const alive = characters.filter((c) => !c.out);
     separate(characters, delta);
@@ -173,8 +174,8 @@ export class BattleScene extends Phaser.Scene {
     for (const character of alive) {
       if (character.target) chasers.set(character.target, (chasers.get(character.target) ?? 0) + 1);
     }
-    // Players run away while typing a new word (word === null) and, a bit slower, while being chased.
-    for (const { character, word, out, parries } of fighters) {
+    for (const fighter of fighters) {
+      const { character, out, parries } = fighter;
       if (out) continue;
       // Forget counters against chasers who stopped coming (knocked out, or their chase ended elsewhere).
       for (const chaser of parries) if (chaser.out || chaser.character.target !== character) parries.delete(chaser);
@@ -182,11 +183,35 @@ export class BattleScene extends Phaser.Scene {
       character.chaseSpeed = CHASE_SPEED * (1 + this.suddenDeath * SUDDEN_DEATH_BOOST);
       const chasedBy = chasers.get(character) ?? 0;
       character.setAlert(chasedBy);
-      character.fleeSpeed = this.over || !this.fighting ? 0 : Math.max(word === null ? FLEE_SPEED : 0, chasedBy ? CHASED_FLEE_SPEED : 0);
-      if (character.fleeSpeed) character.steerAway(alive.filter((c) => c !== character), delta);
+      this.steer(fighter, chasedBy, alive.filter((c) => c !== character), delta);
     }
     for (const character of characters) character.update(time, delta);
     this.heart?.update(time, delta);
+  }
+
+  // Players run away while typing a new word (word === null) and, a bit slower, while being chased.
+  steer(fighter, chasedBy, others, delta) {
+    const { character } = fighter;
+    const typing = this.carriesWord(fighter) && fighter.word === null;
+    character.fleeSpeed = this.over || !this.fighting ? 0 : Math.max(typing ? FLEE_SPEED : 0, chasedBy ? CHASED_FLEE_SPEED : 0);
+    if (character.fleeSpeed) character.steerAway(others, delta);
+  }
+
+  // ---- Who fights whom (SurvivalScene overrides these) ----
+
+  // Every fighter on screen, knocked out or not.
+  everyone() {
+    return [...this.fighters.values()];
+  }
+
+  // The fighters still standing that `fighter` can attack and be attacked by.
+  foes(fighter) {
+    return this.alive().filter((f) => f !== fighter);
+  }
+
+  // Whether this fighter shows a word others type to attack them.
+  carriesWord(_fighter) {
+    return true;
   }
 
   // ---- Bridge events ----
@@ -194,21 +219,21 @@ export class BattleScene extends Phaser.Scene {
   onChat({ player: { name }, text }) {
     const attacker = this.fighters.get(name);
     if (!attacker) {
-      if (!roster.has(name)) { roster.join(name); this.addLog(`👋 ${name} joins next round`); }
+      if (!roster.has(name)) { roster.join(name); this.addLog(`👋 ${name} joins ${this.joinsWhen}`); }
       return;
     }
     if (this.over || !this.fighting || attacker.out) return;
 
     const words = tokenize(text);
     // Counter: typing the word of someone chasing you readies a parry instead of chasing them back.
-    const chaser = this.alive().find((f) => f.character.target === attacker.character && words.has(f.word));
+    const chaser = this.foes(attacker).find((f) => f.character.target === attacker.character && words.has(f.word));
     if (chaser) {
       if (!attacker.parries.has(chaser)) { attacker.parries.add(chaser); this.addLog(`🛡️ ${attacker.name} braces for ${chaser.name}`); }
       return;
     }
     const heart = this.liveHeart();
     if (heart && words.has(heart.word) && !attacker.character.chasing) { this.grab(attacker, heart); return; }
-    const victim = this.alive().find((f) => f !== attacker && words.has(f.word));
+    const victim = this.foes(attacker).find((f) => words.has(f.word));
     if (victim && !attacker.character.chasing) { this.attack(attacker, victim); return; }   // one attack at a time
 
     const reason = this.missReason(attacker, words, victim || words.has(heart?.word));
@@ -225,7 +250,7 @@ export class BattleScene extends Phaser.Scene {
     if (attacker.character.chasing) return live ? 'busy!' : null;   // plain chatter mid-chase is fine
     if (words.has(attacker.word)) return "that's you!";
     // An old word: someone who was just hit (now "typing"), or a knocked-out player.
-    const others = [...this.fighters.values()].filter((f) => f !== attacker);
+    const others = this.everyone().filter((f) => f !== attacker);
     if (others.some((f) => words.has(f.lastWord) || (f.out && words.has(f.word))) || words.has(this.lastHeartWord)) return 'too late!';
     const liveWords = others.filter((f) => !f.out && f.word).map((f) => f.word);
     if (this.liveHeart()) liveWords.push(this.heart.word);
@@ -249,19 +274,25 @@ export class BattleScene extends Phaser.Scene {
   land(attacker, victim) {
     if (this.over || attacker.out || victim.out) return;
     if (victim.parries.delete(attacker)) { this.clash(attacker, victim); return; }
+    this.hit(attacker, victim);
+    if (victim.hp === 0) this.knockOut(victim, attacker);
+    else this.retype(victim);
+  }
 
+  hit(attacker, victim) {
     this.lastHitAt = this.time.now;
     attacker.character.swing();
     victim.hp = Math.max(0, victim.hp - DAMAGE);
-    victim.character.setHp(victim.hp, MAX_HP).hurt(attacker.character.x, attacker.character.y);
+    victim.character.setHp(victim.hp, victim.maxHp, this.heartIcon(victim)).hurt(attacker.character.x, attacker.character.y);
     this.cameras.main.shake(120, 0.004);
     this.floatText(victim.character.x, victim.character.y - 70, `-${DAMAGE}`, '#ff6b6b');
+  }
 
-    if (victim.hp === 0) { this.knockOut(victim, attacker); return; }
-
-    // The victim loses their word and "types" a new one (running away from everyone meanwhile), so
-    // nobody new can target them until it appears. Chasers already on their way still land their
-    // hits; each hit restarts the delay.
+  // The victim of a hit loses their word and "types" a new one (running away from everyone meanwhile), so
+  // nobody new can target them until it appears. Chasers already on their way still land their
+  // hits; each hit restarts the delay.
+  retype(victim) {
+    if (!this.carriesWord(victim)) return;
     if (victim.word) {
       victim.lastWord = victim.word;   // typing it now says "too late!"
       victim.word = null;
@@ -284,7 +315,7 @@ export class BattleScene extends Phaser.Scene {
     this.floatText(d.x, d.y - 125, 'parry!', '#7fd4ff');
     this.addLog(`🛡️ ${defender.name} parried ${attacker.name}`);
     const taken = new Set([attacker.word, attacker.lastWord, defender.word, defender.lastWord]);   // make sure the words change
-    for (const f of [attacker, defender]) {
+    for (const f of [attacker, defender].filter((f) => this.carriesWord(f))) {
       f.revealTimer?.remove();
       f.revealTimer = null;
       if (f.word) f.lastWord = f.word;   // typing it now says "too late!"
@@ -387,7 +418,7 @@ export class BattleScene extends Phaser.Scene {
 
   // Give a fighter a word nobody else has (nor any in `avoid`) and pop it into their bubble.
   newWord(fighter, avoid = []) {
-    fighter.word = pickWord(new Set([...this.fighters.values()].map((f) => f.word).concat(...avoid)));
+    fighter.word = pickWord(new Set(this.everyone().map((f) => f.word).concat(...avoid)));
     fighter.character.setBubble(fighter.word, { highlight: true, pop: true });
   }
 
@@ -447,7 +478,17 @@ export class BattleScene extends Phaser.Scene {
   }
 
   fighterOf(character) {
-    return character && [...this.fighters.values()].find((f) => f.character === character);
+    return character && this.everyone().find((f) => f.character === character);
+  }
+
+  // Who joins when someone chats mid-round, for the log.
+  get joinsWhen() {
+    return 'next round';
+  }
+
+  // What a fighter's HP shows as (SurvivalScene's enemies have their own).
+  heartIcon(_fighter) {
+    return '❤️';
   }
 
   addLog(line) {

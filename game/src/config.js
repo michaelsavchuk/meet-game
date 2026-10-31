@@ -70,6 +70,47 @@ export const HEART_HEAL = 1;
 export const HEART_NEAR = { min: 90, max: 220 };   // px from the hurt player it drops by
 export const HEART_ANYWHERE = 0.25;                // chance it lands anywhere on the floor instead
 
+// Co-op survival (SurvivalScene): players have no words and fight waves of enemies together. Enemies run in from the
+// stairs one by one during a wave and attack players on their own, timed like CPU players (bots.js LEVELS) at their level.
+export const ENEMY_EMOJI = ['💀', '🐍', '👹', '👺', '👿', '😈', '🦇', '🕷️', '🦂', '🐀', '☠️', '🧟', '👾'];
+export const ENEMY_TINT = { easy: 0xcfaaff, normal: 0xb88aff, hard: 0x9d62ff };   // purple, deeper the tougher
+export const ENEMY_MAX_HP = 5;
+export const ENEMY_REST = 1.5;          // × a CPU player's pause between attacks, so players get a breather
+export const ENEMY_RUSH = 800;          // ms until the next enemy while too few are on the floor (ENEMIES_PER_PLAYER)
+export const ENEMY_ENTER_SPEED = 420;   // px/s running in (players run in at ENTER_SPEED)
+export const ENEMIES_PER_PLAYER = 0.5;  // keep at least this many enemies per player on the floor (rounded up) mid-wave
+export const ROAM_AVOID_RADIUS = 220;   // roaming players and enemies steer away from each other within this
+export const WAVE_BREAK = 2500;         // ms between clearing a wave and the next one's banner
+export const WAVE_HEAL = 1;             // HP every survivor gets back between waves
+
+// The host's co-op difficulty setting (the control page's slider; index into this, NORMAL by default). It applies from
+// the next wave: × enemies per wave, + toughness (see waveSpec), + enemy HP, and × how long enemies rest between attacks.
+export const DIFFICULTIES = [
+  { label: 'Very easy', count: 0.6, toughness: -0.75, hp: -1, rest: 1.7 },
+  { label: 'Easy', count: 0.8, toughness: -0.35, hp: 0, rest: 1.3 },
+  { label: 'Normal', count: 1, toughness: 0, hp: 0, rest: 1 },
+  { label: 'Hard', count: 1.25, toughness: 0.5, hp: 0, rest: 0.8 },
+  { label: 'Very hard', count: 1.5, toughness: 1, hp: 1, rest: 0.6 },
+];
+export const NORMAL = 2;
+
+// Wave n (from 1) for `players` players at `setting` (DIFFICULTIES): how many enemies, their HP range, how tough they
+// are (0 or less = all easy, 1 = all normal, 2+ = all hard, in between a mix), ms between enemies running in, and the
+// multiplier on ENEMY_REST. Things ramp up at different waves so they don't all spike at once: toughness climbs
+// steadily (all normal by wave 7, all hard by 13), and extra HP only starts later (some 2-HP enemies from wave 6,
+// all of them from 11, and the max goes up 1 every 4 waves).
+export function waveSpec(n, players, setting = DIFFICULTIES[NORMAL]) {
+  // Early waves' few, weak enemies come quickly so nobody stands around; from wave 5 the gap shrinks again as it gets harder.
+  const pace = n < 5 ? 0.3 + n * 0.1 : Math.max(0.5, 1 - n * 0.04);
+  return {
+    count: Math.max(1, Math.round((2 + Math.floor(n * 0.75) + Math.floor(players / 2)) * setting.count)),
+    hp: [1 + Math.floor((n - 1) / 10), 1 + Math.floor(Math.max(0, n - 2) / 4)].map((hp) => Math.min(ENEMY_MAX_HP, Math.max(1, hp + setting.hp))),
+    difficulty: (n - 1) / 6 + setting.toughness,
+    spawnEvery: [3000 * pace, 6000 * pace],
+    rest: setting.rest,
+  };
+}
+
 export const CHAT_BUBBLE_MS = 4000; // how long lobby chat stays above a character
 
 // Dev fake events: the game page's dev keys and the control page's "fake events" buttons (see the scenes' `commands`).

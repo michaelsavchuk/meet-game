@@ -2,9 +2,10 @@ import * as Phaser from '/vendor/phaser.js';
 import { connectBridge, isConnected, viaServer } from './bridge.js';
 import { connectRemote } from './remote.js';
 import { startBots, addBot, removeBots, botLevels } from './bots.js';
-import { WIDTH, HEIGHT, FONT_FAMILY, DISPLAY_FONT, TEST_STRING, DEV_EVENTS } from './config.js';
+import { WIDTH, HEIGHT, FONT_FAMILY, DISPLAY_FONT, TEST_STRING, DEV_EVENTS, DIFFICULTIES } from './config.js';
 import { LobbyScene } from './scenes/LobbyScene.js';
 import { BattleScene } from './scenes/BattleScene.js';
+import { SurvivalScene, coopDifficulty, setCoopDifficulty } from './scenes/SurvivalScene.js';
 import { HudScene } from './scenes/HudScene.js';
 
 // Every scene.add.text() defaults to FONT_FAMILY, so emoji render with Noto Color Emoji (see index.html), and
@@ -23,12 +24,16 @@ const game = new Phaser.Game({
   // Fixed 16:9 canvas scaled to fit the window, so it looks the same in the Meet screen share.
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: WIDTH, height: HEIGHT },
   // Lobby starts first; the HUD runs on top of every scene.
-  scene: [LobbyScene, BattleScene, HudScene],
+  scene: [LobbyScene, BattleScene, SurvivalScene, HudScene],
 });
 
 connectBridge(game);
-connectRemote(game, () => ({ viaServer, devEvents: DEV_EVENTS, connected: isConnected(), cpus: botLevels() }), {
+connectRemote(game, () => ({
+  viaServer, devEvents: DEV_EVENTS, connected: isConnected(), cpus: botLevels(),
+  difficulty: coopDifficulty(), difficulties: DIFFICULTIES.map((d) => d.label),
+}), {
   addCpu: (level) => addBot(level),
+  setDifficulty: (value) => setCoopDifficulty(value),
   removeCpus: () => removeBots(game),
 });
 startBots(game);

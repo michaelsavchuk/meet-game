@@ -1,12 +1,13 @@
 import * as Phaser from '/vendor/phaser.js';
 import { simulateChat, simulateReaction, FAKE_EMOJI } from './bridge.js';
 import { roster } from './roster.js';
-import { MAX_HP } from './config.js';
+import { MAX_HP, ENEMY_REST } from './config.js';
 
 // CPU players, added from the control page. Each one plays like a person in the call: it reads the screen (the
 // active scene's state), takes a moment to react, "types" a word letter by letter at its own speed, sometimes makes
 // a typo and retypes it, and sends chat the same way real messages arrive (simulateChat), so the game treats it like anyone else.
 // Bots live outside the scenes and follow the roster: they join by chatting, and "Clear players" drops them.
+// Co-op enemies (EnemyBrain, below) use the same levels and targeting, but act inside SurvivalScene instead of chatting.
 
 const TICK_MS = 100;
 
@@ -29,6 +30,7 @@ const KNOCKED_OUT = ['gg', 'noooo', 'rip me', 'gg wp', 'nooo i was so close', 'u
 const WON = ['gg!', 'gg ez', 'yesss', 'gg everyone', 'lets gooo'];
 const LOST = ['gg', 'gg wp', 'nice one', 'rematch?'];
 const KEYS = 'qwertyuiopasdfghjklzxcvbnm';
+const ENEMY_WORD = 6;   // letters an enemy "types" before each attack (players have no words in co-op)
 
 const rand = ([min, max]) => Phaser.Math.Between(min, max);
 const chance = (p) => Math.random() < p;
@@ -81,16 +83,7 @@ class Bot {
   constructor(name, level) {
     this.name = name;
     this.level = level;
-    // Everyone's a little different, even at the same level.
-    const base = LEVELS[level];
-    const vary = (n) => n * Phaser.Math.FloatBetween(0.8, 1.2);
-    this.msPerChar = 12000 / vary(base.wpm);
-    this.react = base.react.map(vary);
-    this.typo = vary(base.typo);
-    this.counter = Math.min(1, vary(base.counter));
-    this.greed = Math.min(1, vary(base.greed));
-    this.pause = base.pause.map(vary);
-    this.style = pick(STYLES);
+    Object.assign(this, skills(level));
     this.joined = false;
     this.scene = null;
   }
@@ -113,7 +106,7 @@ class Bot {
   tick(scene, now) {
     if (scene !== this.scene) this.reset(scene, now);
     if (scene.scene.key === 'lobby') this.lobby(now);
-    else if (scene.scene.key === 'battle') this.battle(scene, now);
+    else if (scene.fighters) this.battle(scene, now);   // a battle, or co-op (attacking enemies instead)
   }
 
   // Now and then say something or react (which changes their emoji), like people waiting for a game.
@@ -146,7 +139,7 @@ class Bot {
     }
     if (!scene.fighting) { this.nextThinkAt = now + rand(this.react); return; }
 
-    const chasers = scene.alive().filter((f) => f.character.target === me.character);
+    const chasers = scene.foes(me).filter((f) => f.character.target === me.character);
     if (me.hp < this.lastHp) this.lastHitBy = this.lastChasers.find((f) => !f.out) ?? this.lastHitBy;
     this.lastHp = me.hp;
     this.lastChasers = chasers;
@@ -181,18 +174,8 @@ class Bot {
 
   // Pick someone to attack and start typing their word.
   choose(scene, me, now) {
-    const targets = scene.alive().filter((f) => f !== me && f.word);
-    if (!targets.length) return;
-    const weights = targets.map((f) => {
-      const dist = Phaser.Math.Distance.Between(me.character.x, me.character.y, f.character.x, f.character.y);
-      let w = 1 + (MAX_HP - f.hp) * 0.5 + (1 - Math.min(dist, 1000) / 1000);
-      if (this.style === 'hunter') w += (MAX_HP - f.hp) * 2;
-      if (this.style === 'brawler') w += 3 * (1 - Math.min(dist, 1000) / 1000);
-      if (this.style === 'grudge' && f === this.lastHitBy) w += 4;
-      return this.style === 'wild' ? 1 : w;
-    });
-    let roll = Math.random() * weights.reduce((a, b) => a + b);
-    const target = targets.find((_, i) => (roll -= weights[i]) < 0) ?? targets.at(-1);
+    const target = pickTarget(me, scene.foes(me).filter((f) => f.word), this.style, this.lastHitBy);
+    if (!target) return;
     this.plan = { kind: 'attack', word: target.word, target, sendAt: now + rand(this.react) + this.typingTime(target.word) };
   }
 
@@ -220,9 +203,8 @@ class Bot {
     this.nextThinkAt = now + rand(this.pause) * pauseScale;
   }
 
-  // ms to type `word`, a bit uneven like real typing.
   typingTime(word) {
-    return [...word].reduce((ms) => ms + this.msPerChar * Phaser.Math.FloatBetween(0.6, 1.4), 0);
+    return typingTime(this.msPerChar, word.length);
   }
 
   // Chat after a delay (knocked-out players don't affect the game, so this is just flavor).
@@ -235,6 +217,70 @@ class Bot {
     simulateChat(this.name, this.pendingSay.text);
     this.pendingSay = null;
   }
+}
+
+// A co-op enemy (SurvivalScene). It doesn't chat: between attacks it waits as long as a CPU player at its level would
+// take to rest, notice someone and type a word (retyping a typo), then runs at a player picked the way a CPU picks
+// (STYLES). Players being hit by it can still counter. Call tick() every frame once it's on the floor.
+export class EnemyBrain {
+  // `rest` scales its pause between attacks (on top of ENEMY_REST), from the co-op difficulty setting.
+  constructor(level, rest = 1) {
+    Object.assign(this, skills(level));
+    this.rest = ENEMY_REST * rest;
+    this.attackAt = null;   // when it strikes next; null while busy (chasing, or reeling from a hit)
+  }
+
+  tick(scene, me, now) {
+    // Busy chasing, or hit and "typing" a new word: start the wait over once that's done.
+    if (me.character.chasing || !me.word) { this.attackAt = null; return; }
+    if (this.attackAt == null) {
+      const retype = chance(this.typo) ? rand(this.react) * 0.7 + typingTime(this.msPerChar, ENEMY_WORD) : 0;
+      this.attackAt = now + rand(this.pause) * this.rest + rand(this.react) + typingTime(this.msPerChar, ENEMY_WORD) + retype;
+      return;
+    }
+    if (now < this.attackAt) return;
+    this.attackAt = null;
+    const target = pickTarget(me, scene.foes(me), this.style, me.lastHitBy);
+    if (target) scene.attack(me, target);
+  }
+}
+
+// A CPU's (or enemy's) knack at `level`: everyone's a little different, even at the same level.
+function skills(level) {
+  const base = LEVELS[level];
+  const vary = (n) => n * Phaser.Math.FloatBetween(0.8, 1.2);
+  return {
+    msPerChar: 12000 / vary(base.wpm),
+    react: base.react.map(vary),
+    typo: vary(base.typo),
+    counter: Math.min(1, vary(base.counter)),
+    greed: Math.min(1, vary(base.greed)),
+    pause: base.pause.map(vary),
+    style: pick(STYLES),
+  };
+}
+
+// Who to go after among `targets`, by `style` (see STYLES): everyone is a bit likelier the more hurt and nearer they are.
+function pickTarget(me, targets, style, lastHitBy) {
+  if (!targets.length) return null;
+  const weights = targets.map((f) => {
+    const dist = Phaser.Math.Distance.Between(me.character.x, me.character.y, f.character.x, f.character.y);
+    const near = 1 - Math.min(dist, 1000) / 1000;
+    let w = 1 + (f.maxHp - f.hp) * 0.5 + near;
+    if (style === 'hunter') w += (f.maxHp - f.hp) * 2;
+    if (style === 'brawler') w += 3 * near;
+    if (style === 'grudge' && f === lastHitBy) w += 4;
+    return style === 'wild' ? 1 : w;
+  });
+  let roll = Math.random() * weights.reduce((a, b) => a + b);
+  return targets.find((_, i) => (roll -= weights[i]) < 0) ?? targets.at(-1);
+}
+
+// ms to type `letters` letters, a bit uneven like real typing.
+function typingTime(msPerChar, letters) {
+  let ms = 0;
+  for (let i = 0; i < letters; i++) ms += msPerChar * Phaser.Math.FloatBetween(0.6, 1.4);
+  return ms;
 }
 
 // One slip of the fingers: a wrong, dropped, swapped or doubled letter (one edit, so the game says "so close!").

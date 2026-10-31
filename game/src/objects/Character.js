@@ -152,7 +152,7 @@ export class Character extends Phaser.GameObjects.Container {
     this.figure = scene.add.container(0, 0, [this.emoji, this.sword, this.shield]);   // held items in front
     this.gripY = 0;   // where the sword and shield have caught up to in the hop (they trail it slightly)
     this.nameText = scene.add.text(0, 38, player.name, { fontSize: '16px', color: '#e8e8f0', fontStyle: 'bold' }).setOrigin(0.5, 0);
-    this.hearts = scene.add.text(0, 58, '', { fontSize: '14px' }).setOrigin(0.5, 0).setVisible(false);
+    this.hearts = scene.add.text(0, player.name ? 58 : 38, '', { fontSize: '14px' }).setOrigin(0.5, 0).setVisible(false);
     this.add([this.shadow, this.figure, this.nameText, this.hearts]);
 
     // The bubble is its own object on a high depth so it's never hidden behind another character.
@@ -190,8 +190,14 @@ export class Character extends Phaser.GameObjects.Container {
     return this;
   }
 
-  setHp(hp, max) {
-    this.hearts.setVisible(true).setText('❤️'.repeat(hp) + '🖤'.repeat(Math.max(0, max - hp)));
+  setHp(hp, max, full = '❤️') {
+    this.hearts.setVisible(true).setText(full.repeat(hp) + '🖤'.repeat(Math.max(0, max - hp)));
+    return this;
+  }
+
+  // Tint the emoji (multiplied with its colors), e.g. enemies in co-op.
+  setEmojiTint(color) {
+    this.emoji.setTint(color);
     return this;
   }
 
@@ -391,9 +397,9 @@ export class Character extends Phaser.GameObjects.Container {
     });
   }
 
-  // Turn away from `others` within FLEE_RADIUS (closer ones count more) and from nearby walls.
+  // Turn away from `others` within `radius` (closer ones count more) and from nearby walls.
   // Call before update() each frame while fleeSpeed > 0.
-  steerAway(others, delta) {
+  steerAway(others, delta, radius = FLEE_RADIUS) {
     if (this.airborne) return;
     let ax = 0;
     let ay = 0;
@@ -401,8 +407,8 @@ export class Character extends Phaser.GameObjects.Container {
       const dx = this.x - other.x;
       const dy = this.y - other.y;
       const dist = Math.hypot(dx, dy) || 1;
-      if (dist >= FLEE_RADIUS) continue;
-      const weight = (FLEE_RADIUS - dist) / FLEE_RADIUS;
+      if (dist >= radius) continue;
+      const weight = (radius - dist) / radius;
       ax += (dx / dist) * weight;
       ay += (dy / dist) * weight;
     }
@@ -430,21 +436,24 @@ export class Character extends Phaser.GameObjects.Container {
   }
 
   // Run in from a random staircase to `spot` (default: anywhere on the floor), starting off screen after `delay` ms.
-  // `duration` (ms, counted from the start of the run) sets the pace instead of ENTER_SPEED. Floor limits don't apply
+  // Runs at `speed` px/s, or `duration` (ms, counted from the start of the run) sets the pace. Floor limits don't apply
   // until the spot is reached; then it wanders as usual.
-  enter({ spot = randomSpot(), delay = 0, duration } = {}) {
+  enter({ spot = randomSpot(), delay = 0, duration, speed = ENTER_SPEED } = {}) {
     this.path = entryPath(spot);
     this.setPosition(this.path[0].x, this.path[0].y);
     this.lastPos = { x: this.x, y: this.y };
     let length = 0;
     this.path.reduce((a, b) => { length += Math.hypot(b.x - a.x, b.y - a.y); return b; });
-    this.pathSpeed = duration ? length / (duration / 1000) : ENTER_SPEED;
+    this.pathSpeed = duration ? length / (duration / 1000) : speed;
     this.pathDelay = delay / 1000;
     this.path.shift();
     return this;
   }
 
   get entering() { return this.path != null; }
+
+  // Still off screen or on the stairs while entering (the path's left: the stairs' foot, then the spot).
+  get onStairs() { return this.path?.length > 1; }
 
   stepPath(dt) {
     if (this.pathDelay > 0) { this.pathDelay -= dt; return; }
@@ -526,6 +535,7 @@ export class Character extends Phaser.GameObjects.Container {
   knockOut(fromX, fromY, onGone) {
     this.out = true;
     this.cancelChase();
+    this.path = null;   // e.g. an enemy knocked out on its way in
     this.shakeTween?.remove();
     this.air = 0;
     this.setSword(false).setShield(false).setBubble(null).setAlert(0);
