@@ -74,6 +74,26 @@ function observeChat() {
   new MutationObserver(scan).observe(document.body, { childList: true, subtree: true, characterData: true });
 }
 
+// ---- Your own name (meet.google.com) ----
+// Meet's built-in chat doesn't name your own messages, but your video tile shows your name, so both use this
+// to agree on it. The account chip ("Google Account: Name (email)") is on the pre-join page; your own tile is
+// the one with the Reframe / Backgrounds and effects buttons, found by their icon names, which aren't translated.
+let selfName = null;
+const SELF_TILE_ICONS = new Set(['frame_person', 'visual_effects']);
+
+function readSelfName() {
+  const label = document.querySelector('[aria-label^="Google Account:"]')?.getAttribute('aria-label');
+  const name = label?.replace(/^Google Account:\s*/, '').split(/\s*[\n(]/)[0].trim();
+  if (name) return (selfName = name);
+  if (selfName) return selfName;
+  for (const icon of document.querySelectorAll('[data-participant-id] i.google-symbols')) {
+    if (!SELF_TILE_ICONS.has(icon.textContent.trim())) continue;
+    const tileName = icon.closest('[data-participant-id]').querySelector('span.notranslate')?.innerText?.trim();
+    if (tileName) return (selfName = tileName);
+  }
+  return null;
+}
+
 // ---- In-call emoji reactions (meet.google.com) ----
 // When someone reacts, Meet drops an <img data-emoji> badge into their video tile.
 // The tile carries data-participant-id and the person's name in span.notranslate.
@@ -128,14 +148,6 @@ function observeMeetChat() {
   const seen = new Set();                     // message ids
   const seenEls = new WeakSet();              // elements (the id can change in place)
   const recent = new Map();                   // "sender\ntext" -> when we last sent it
-  let selfName = null;
-
-  // The account chip ("Google Account: Name (email)") is on the pre-join page; remember it for the call.
-  function readSelfName() {
-    const label = document.querySelector('[aria-label^="Google Account:"]')?.getAttribute('aria-label');
-    const name = label?.replace(/^Google Account:\s*/, '').split(/\s*[\n(]/)[0].trim();
-    if (name) selfName = name;
-  }
 
   // Ids look like "spaces/<space>/messages/<microseconds since epoch>".
   function sentAt(id) {
@@ -144,7 +156,7 @@ function observeMeetChat() {
   }
 
   // The group is the aria-live list's direct child. Its name is the first text before the first
-  // message that isn't the timestamp; no name means it's one of your own messages.
+  // message that isn't the timestamp; no name (or "You") means it's one of your own messages.
   function senderOf(el) {
     const group = el.closest('[aria-live] > *');
     if (!group) return null;
@@ -165,11 +177,12 @@ function observeMeetChat() {
   }
 
   function parse(el) {
-    const name = senderOf(el);
+    let name = senderOf(el);
+    if (name === 'You') name = null;
     return {
       id: el.getAttribute('data-message-id'),
       userId: name ? `meet:${name}` : 'meet:self',
-      sender: name || selfName || 'You',
+      sender: name || readSelfName() || 'You',
       text: bodyOf(el)?.innerText?.trim() ?? '',
       receivedAt: new Date().toISOString(),
     };

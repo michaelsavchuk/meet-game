@@ -79,8 +79,8 @@ so players are keyed by display name for now.
   follow-up messages don't repeat the name.
 - Some calls use Meet's own chat panel (on `meet.google.com`) instead of the Chat frame. There each
   `div[data-message-id]` is a message inside an `[aria-live]` list whose children are sender groups; the name
-  sits in the group header (none for your own messages, which use the signed-in account's name from the
-  pre-join page's "Google Account:" chip, else "You"). Ids end in the send time in microseconds, so messages
+  sits in the group header (none, or "You", for your own messages, which use the signed-in account's name from the
+  pre-join page's "Google Account:" chip, else the name on your own video tile, else "You"). Ids end in the send time in microseconds, so messages
   more than 30s old when they appear are treated as history. Meet re-renders messages under new ids, so the same
   sender + text again within 10s is dropped.
 - Messages already on screen when the page loads are treated as history and not sent.

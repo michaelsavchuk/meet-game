@@ -131,7 +131,9 @@ other tuning; animation tuning lives at the top of Character.js).
   over minified class names or `jsname` values; keep a fallback when a minified token is unavoidable.
 - Chat and reactions use different ids for the same person (Chat user id vs. Meet participant id),
   so the game keys players by display name. Reactions only count for names that already joined via
-  chat. Unverified: the host's own video tile may label them "You", which wouldn't match their chat name.
+  chat. Your own video tile shows your real name, but Meet's built-in chat doesn't name your own messages, so
+  `readSelfName()` gets it from the pre-join account chip or, failing that, your own tile (the one with the
+  `frame_person` / `visual_effects` buttons); the chat falls back to "You" only if neither is found.
 - Emoji typed in chat messages are dropped: Chat renders them as `<img data-emoji alt="…">` and the
   extension reads `innerText`.
 - Messages already on screen when the chat frame loads are treated as history and not sent.
