@@ -16,12 +16,11 @@ dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /even
   `meet.google.com` (top frame) → reaction badges on video tiles, plus Meet's own built-in chat panel
   (`observeMeetChat()`), which some calls use instead of the Chat frame. It sends raw payloads
   (`chat-message` / `meet-reaction`) with `chrome.runtime.sendMessage`, which reaches the game page directly.
-- `game/extension/background.js` only handles the toolbar button: it opens the game in a tab next to the current one
-  and the control page in the side panel (`chrome.sidePanel`, global so it stays open across tabs), or in a tab where
+- `game/extension/background.js` only handles the toolbar button: it opens the game in a popup window of its own (sized to
+  the game, and it keeps drawing while you switch tabs in Meet's window) and the control page in the side panel (`chrome.sidePanel`, global so it stays open across tabs), or in a tab where
   the browser has no sidePanel API (Firefox uses `sidebar_action` / `browser.sidebarAction` instead). `sidePanel.open()`
   must run before any `await` (user gesture). The manifest lists both `background.service_worker` (Chrome) and
-  `background.scripts` (Firefox event page); each browser uses its own. Firefox can only share windows in Meet and
-  stops drawing background tabs, so there the game opens in its own popup window instead of a tab.
+  `background.scripts` (Firefox event page); each browser uses its own.
 - `game/src/events.js` normalizes raw payloads into game events
   (`{ type: 'chat' | 'reaction', player: { id, name }, text | emoji, at }`); shared by the bridge and the server.
 - `game/src/bridge.js` picks its transport: as an extension page (`chrome.runtime.id` set) it listens to
@@ -43,7 +42,7 @@ dev server:  /play, dev keys --POST /messages, /reactions--> server/ --SSE /even
   anyone else. Each has its own typing speed (WPM), reaction time, typo rate (sends a typo, then retypes it), chance to
   notice a chaser and counter, heart greed, and targeting style (`STYLES`), varied a little per bot from `LEVELS`.
   They join by saying hi, leave when the roster is cleared, and "Remove CPUs" (lobby only) uses `LobbyScene.removePlayer()`.
-  Phaser pauses in a background tab, so keep the game tab in front for CPUs to play.
+  Phaser pauses in a background tab, so keep the game window visible for CPUs to play.
 - Play page (`/play` → `game/play.html`, self-contained, dev server only; left out of `npm run package`): a fallback for when the extension can't read Meet. Players
   pick a name and send chat/reactions in the extension's raw payload shape; it shows everyone's chat from `/events`.
   It may be served through a tunnel (ngrok), so it uses relative URLs only and avoids secure-context-only APIs.

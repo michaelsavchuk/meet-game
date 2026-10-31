@@ -19,7 +19,7 @@ let difficulties = [];   // co-op difficulty labels (config.js DIFFICULTIES)
 let backgroundsShown = false;   // the background options are filled in from the first snapshot
 
 $('open-game').addEventListener('click', () => {
-  if (globalThis.chrome?.tabs) chrome.tabs.create({ url: chrome.runtime.getURL('index.html') });
+  if (globalThis.chrome?.windows) chrome.windows.create({ url: chrome.runtime.getURL('index.html'), type: 'popup', width: 1280, height: 760 });
   else window.open('/', '_blank');
 });
 $('add-cpu').addEventListener('click', () => send('addCpu', $('cpu-level').value));

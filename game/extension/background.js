@@ -1,18 +1,17 @@
-// The toolbar button opens the game in a tab next to the current one (share that tab in Meet) and the host's
-// control page in the browser's side panel (Firefox: its sidebar), so it stays beside Meet and the game as you
-// switch tabs. Browsers with neither get the control page in a tab instead.
+// The toolbar button opens the game in a toolbar-less window of its own, sized to the game (share that window or
+// its tab in Meet), and the host's control page in the browser's side panel (Firefox: its sidebar), so it stays
+// beside Meet as you switch tabs. Browsers with neither get the control page in a tab instead.
 //
 // Chrome runs this as a service worker and Firefox as an event page (manifest lists both), so it can't rely on
 // either: no importScripts, no DOM.
 //
-// Firefox can't share a single tab in Meet, only a window or screen, and it stops drawing a tab that isn't in front,
-// so there the game gets its own toolbar-less window instead of a tab (getBrowserInfo only exists in Firefox).
+// A window of its own also stays drawn while you switch tabs in the Meet window (Phaser pauses in a background tab),
+// and Firefox can only share a window or screen in Meet, not a single tab.
 //
 // Chat and reactions don't pass through here: the content script's chrome.runtime.sendMessage reaches the
 // game page directly (see bridge.js).
 const GAME = 'index.html';
 const CONTROL = 'control.html';
-const GAME_WINDOW = !!chrome.runtime.getBrowserInfo;
 
 chrome.action.onClicked.addListener((tab) => {
   // sidePanel.open() only works while the click still counts as a user gesture, so it goes before any await.
@@ -20,7 +19,7 @@ chrome.action.onClicked.addListener((tab) => {
   if (chrome.sidePanel?.open) chrome.sidePanel.open({ windowId: tab.windowId }).catch(fallback);
   else if (globalThis.browser?.sidebarAction?.open) browser.sidebarAction.open().catch(fallback);
   else fallback();
-  openPage(GAME, tab, true, GAME_WINDOW);
+  openPage(GAME, tab, true, true);
 });
 
 // Opens one of the extension's pages next to `tab` (or in a window of its own), or switches to it if it's already open.

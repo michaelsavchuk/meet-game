@@ -49,10 +49,10 @@ random one each round, or pick one with the control page's **Background** dropdo
 
 ## Host a game
 1. Join the Meet call and open its chat panel. If the call was already open when you installed the extension, reload it.
-2. Click the ⚔️ toolbar button. The game opens in a tab next to Meet, and the control page opens in the browser's side
+2. Click the ⚔️ toolbar button. The game opens in a window of its own, sized to fit, and the control page opens in the browser's side
    panel (in another tab on browsers without a side panel). The control page shows the players, words, HP and battle
    log, and has the host buttons (Start, Clear players, End round / Back to lobby), so none of that is on the shared screen.
-3. In Meet, present the game tab. Participants' chats and reactions show up in the game.
+3. In Meet, present the game window. Participants' chats and reactions show up in the game.
 
 **CPU players**: pick a level (Easy, Normal, Hard or Mixed) and click **Add CPU** on the control page. CPUs join
 by chatting and play by typing words at their own speed, with typos, counters and heart grabs, so you can play with fewer people.
