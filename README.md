@@ -1,8 +1,4 @@
-# Meet Game
-
-<a href="docs/trailer.mp4"><img src="docs/trailer.jpg" alt="Meet Game trailer: players type each other's words to attack, parry, and team up against waves of enemies" width="100%"></a>
-
-▶️ [Watch the trailer](docs/trailer.mp4) (17 s)
+https://github.com/user-attachments/assets/bca833b1-be32-4c59-9bd0-08ec4776512d
 
 A game shown on a shared screen in Google Meet. Participants play by sending chat messages
 and in-call emoji reactions.
