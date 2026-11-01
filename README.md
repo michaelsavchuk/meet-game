@@ -77,6 +77,22 @@ the right. Add CPUs and start from the Game Control tab, and type as yourself fr
 browser (no server involved), so it can also be deployed as a static site: `npm run build:web` writes `dist/web/`, which
 any static host can serve. On Netlify, connect the repo and `netlify.toml` takes care of the build.
 
+## Trailer
+The video at the top is recorded from the game itself: http://localhost:8787/trailer plays a scripted trailer (lobby,
+attacks, parries, co-op, a winner) and records the canvas. To make your own:
+
+1. Install [ffmpeg](https://ffmpeg.org), then run `npm run dev` and, in another terminal, `npm run trailer`.
+2. Open http://localhost:8787/trailer in Chrome and click **Record** (**Rehearse** plays it without recording). Keep the
+   window visible until it says it's done: the game stops drawing in a hidden window. Each take comes out a little
+   different, so record again if you don't like one.
+3. The video is written to `dist/trailer.mp4` (about 1.5 MB), with the full-quality take kept as `dist/trailer.webm`.
+   Both are left out of git.
+4. To put it in the README, edit README.md on github.com and drag `dist/trailer.mp4` into the editor. GitHub uploads it and
+   inserts a `https://github.com/user-attachments/assets/…` link, which plays inline; replace the old link at the top
+   with it. (A video committed to the repo only shows as a link, not a player.)
+
+To change the shots, edit the director in `game/src/trailer.js`.
+
 ## Game events
 Scenes subscribe on `this.game.events`:
 

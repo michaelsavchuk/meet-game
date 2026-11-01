@@ -1,5 +1,5 @@
 // `npm run trailer`: waits for recordings from the trailer page (/trailer under the dev server) and turns each into
-// docs/trailer.mp4, small enough for the README, keeping the full-quality take as dist/trailer.webm. Click Record on
+// dist/trailer.mp4, small enough to upload to the README, keeping the full-quality take as dist/trailer.webm. Click Record on
 // the page while this runs; it posts the take here when it's done. Needs ffmpeg on the PATH.
 // `npm run trailer -- some.webm` converts a recording saved earlier (the page downloads it if this isn't running).
 import { execFileSync } from 'node:child_process';
@@ -10,7 +10,7 @@ import path from 'node:path';
 const PORT = 8788;   // trailer.js (the page) posts here
 const ROOT = path.join(import.meta.dirname, '..');
 const TAKE = path.join(ROOT, 'dist', 'trailer.webm');
-const OUTPUT = path.join(ROOT, 'docs', 'trailer.mp4');
+const OUTPUT = path.join(ROOT, 'dist', 'trailer.mp4');
 // The captions (src/trailer.js CAPTION: the banner's 1.5 × 1280 bar at 0.6 scale) end about 65 px in from each side;
 // cropping a little past that makes them run off the edges like the full-size banners.
 const CROP = { x: 72, width: 1136 };

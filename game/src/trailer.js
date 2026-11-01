@@ -1,7 +1,7 @@
 // Trailer page (/trailer, dev only): plays a scripted trailer in the game frame and records it. The director below
 // sends chat into the game the way the bridge does and runs scene commands, so everything on screen is the real game;
 // it only picks who types what, when. It edits as it goes: the recorder runs during each shot (roll()) and pauses
-// between them (cut()), so the take is the finished cut. `npm run trailer` turns it into docs/trailer.mp4.
+// between them (cut()), so the take is the finished cut. `npm run trailer` turns it into dist/trailer.mp4.
 // Captions are the game's flash banner, smaller and at the bottom, so the action stays visible above them.
 import { normalize } from './events.js';
 
@@ -102,7 +102,7 @@ function newRecorder() {
   return rec;
 }
 
-// Post the take to `npm run trailer` (scripts/trailer.js), which makes docs/trailer.mp4; if that isn't running,
+// Post the take to `npm run trailer` (scripts/trailer.js), which makes dist/trailer.mp4; if that isn't running,
 // download it instead. Resolves with what happened, for the status line.
 async function save() {
   const blob = await new Promise((resolve) => {

@@ -61,8 +61,8 @@ solo/static: play.html?local --BroadcastChannel--> game page (index.html?local),
   runs scene commands, and picks who types what from the scenes' state; it edits as it goes, pausing the recorder between
   shots. Captions are BattleScene's `banner()` on a stand-in for the scene, scaled down over the front wall. With
   `npm run trailer` (`scripts/trailer.js`, needs ffmpeg) running, each take is posted to it on port 8788 and becomes
-  `docs/trailer.mp4` (the full-quality take is kept as `dist/trailer.webm`); without it, the take downloads. The README
-  links it from a poster frame, `docs/trailer.jpg`; refresh that with ffmpeg after a new take.
+  `dist/trailer.mp4` (the full-quality take is kept as `dist/trailer.webm`); without it, the take downloads. Neither is
+  committed: the README's video is an upload to GitHub (README "Trailer" has the steps).
 - Static site (`npm run build:web` → `scripts/build-web.js` → `dist/web/`; `netlify.toml` builds and publishes it): all of
   `game/` except the extension's own files (so new game files are included), with the solo page as `index.html` and the
   game page renamed to `game.html`.
@@ -169,7 +169,7 @@ other tuning; animation tuning lives at the top of Character.js).
 - `npm run build:web` builds the static solo site into `dist/web/`; try it with any static server, e.g.
   `python3 -m http.server -d dist/web`.
 - Trailer: `npm run trailer` in one terminal, the dev server in another, then Record on http://localhost:8787/trailer
-  and keep the window visible until it says it wrote `docs/trailer.mp4`. Rehearse plays it without recording.
+  and keep the window visible until it says it wrote `dist/trailer.mp4`. Rehearse plays it without recording.
 - Dev server: `npm start` (or `npm run dev` to restart on changes) → http://localhost:8787, control page at
   http://localhost:8787/control in another tab of the same browser. `PORT=… npm start` uses another port.
 - Dev keys on the game page, also buttons on the control page, only under `npm run dev`: `DEV_EVENTS` (`src/dev.js`,
