@@ -45,7 +45,9 @@ random one each round, or pick one with the control page's **Background** dropdo
 ## Install
 - **From a clone**: go to chrome://extensions, turn on Developer mode, click "Load unpacked", and choose the `game/` folder.
 - **To share it**: `npm run package` makes `dist/meet-game.zip`, which you can upload to the Chrome Web Store (publish it
-  privately to your Google Workspace domain, unlisted, or publicly).
+  privately to your Google Workspace domain, unlisted, or publicly). GitHub Actions also builds it on every push to
+  `main` (download it from the run's artifacts), and pushing a tag matching the manifest's version (`git tag v0.2.0 &&
+  git push origin v0.2.0`) publishes it as a release.
 
 ## Host a game
 1. Join the Meet call and open its chat panel. If the call was already open when you installed the extension, reload it.

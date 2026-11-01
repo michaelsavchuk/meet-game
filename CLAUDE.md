@@ -166,6 +166,8 @@ other tuning; animation tuning lives at the top of Character.js).
   tab). After changing `game/`, reload the extension there and reopen its pages; after changing the content script, also
   reload the Meet tab (content scripts only start on page load, including after a fresh install).
 - `npm run package` zips `game/` into `dist/meet-game.zip` for the Chrome Web Store or sharing.
+  `.github/workflows/package.yml` runs it on every push to `main` (a workflow artifact) and on `v*` tags, which must
+  match `game/manifest.json`'s version, publishes a GitHub release with the zip.
 - `npm run build:web` builds the static solo site into `dist/web/`; try it with any static server, e.g.
   `python3 -m http.server -d dist/web`.
 - Trailer: `npm run trailer` in one terminal, the dev server in another, then Record on http://localhost:8787/trailer

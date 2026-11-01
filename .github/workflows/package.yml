@@ -1,0 +1,44 @@
+# Packages the extension (npm run package) on every push to main, as a workflow artifact.
+# Pushing a tag like v0.2.0 (matching game/manifest.json's version) also publishes it as a GitHub release.
+name: Package extension
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the manifest version
+        id: version
+        run: echo "version=$(jq -r .version game/manifest.json)" >> "$GITHUB_OUTPUT"
+
+      - name: Package
+        run: |
+          npm run package
+          mv dist/meet-game.zip "dist/meet-game-${{ steps.version.outputs.version }}.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: meet-game-${{ steps.version.outputs.version }}
+          path: dist/meet-game-*.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match manifest version $VERSION"
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" "dist/meet-game-$VERSION.zip" --title "$GITHUB_REF_NAME" --generate-notes
