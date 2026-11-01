@@ -7,7 +7,8 @@ import path from 'node:path';
 const ROOT = path.join(import.meta.dirname, '..');
 const GAME = path.join(ROOT, 'game');
 const OUT = path.join(ROOT, 'dist', 'web');
-const SKIP = new Set(['extension', 'manifest.json', 'icons']);   // extension-only, relative to game/
+// Relative to game/: the extension's own files, and the trailer page (dev only).
+const SKIP = new Set(['extension', 'manifest.json', 'icons', 'trailer.html', path.join('src', 'trailer.js')]);
 
 fs.rmSync(OUT, { recursive: true, force: true });
 fs.cpSync(GAME, OUT, {
