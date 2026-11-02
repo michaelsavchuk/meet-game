@@ -54,7 +54,8 @@ solo/static: play.html?local --BroadcastChannel--> game page (index.html?local),
 - Solo page (`/solo` → `game/solo.html` + `src/solo.js`, left out of `npm run package`): the game in an iframe on the
   left, and the play and control pages as tabs on the right, for playing alone (with CPUs) without Meet or a server.
   Its frames load the game and play page with `?local`, and use full file names (`/index.html`, `/play.html`) so they
-  work on any static host.
+  work on any static host. A Quick Start help dialog (`<dialog id="help">`) opens on the first visit (`solo.helpSeen` in
+  localStorage) and from the ? button in the top-left corner.
 - Trailer page (`/trailer` → `game/trailer.html` + `src/trailer.js`, dev server only; left out of `npm run package` and
   `build:web`): plays a scripted trailer in a `?local` game frame and records its canvas (`MediaRecorder`). The director
   sends chat straight to the frame's `game.events` (normalized like the bridge does, so other local games don't get it),
